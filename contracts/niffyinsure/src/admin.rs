@@ -63,7 +63,16 @@ pub enum AdminError {
     InvalidMaxWeightCap = 120,
     /// Cooldown ledgers value is out of allowed bounds.
     CooldownLedgersOutOfBounds = 121,
+    /// Governance cooldown is currently active.
+    GovernanceCooldownActive = 122,
+    /// Governance cooldown value is out of allowed bounds.
+    GovernanceCooldownOutOfBounds = 123,
+    /// Sweep would exceed the per-ledger withdrawal cap.
+    SweepLedgerLimitExceeded = 124,
+    /// Max sweep per ledger value is out of allowed bounds.
+    MaxSweepPerLedgerOutOfBounds = 125,
 }
+
 
 /// Payload for a treasury-rotation proposal.
 #[contracttype]
@@ -413,6 +422,7 @@ pub fn cancel_admin(env: &Env) {
 /// Update the treasury token contract address. Admin must authorize.
 pub fn set_token(env: &Env, new_token: Address) {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     let old_token = storage::get_token(env);
     storage::set_token(env, &new_token);
     TokenUpdated {
@@ -424,10 +434,11 @@ pub fn set_token(env: &Env, new_token: Address) {
 }
 
 /// Update the treasury address. Admin must authorize.
-/// Emits: (\"admin\", \"treasury\") → (old_treasury, new_treasury)
+/// Emits: ("admin", "treasury") → (old_treasury, new_treasury)
 /// *** SINGLE-STEP FALLBACK: Use propose_admin_action for two-step protection ***
 pub fn set_treasury(env: &Env, new_treasury: Address) {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     let old_treasury = storage::get_treasury(env);
     storage::set_treasury(env, &new_treasury);
     TreasuryUpdated {
@@ -509,6 +520,23 @@ fn sweep_token_inner(
     // Validation: asset must be allowlisted (prevents arbitrary token sweeps)
     if !storage::is_allowed_asset(env, &asset) {
         panic_with_error!(env, AdminError::AssetNotAllowlisted);
+    }
+
+    // Per-ledger withdrawal limit (Issue #845)
+    if let Some(max_sweep) = storage::get_max_sweep_per_ledger(env) {
+        let now = env.ledger().sequence();
+        let last_sweep = storage::get_last_sweep_ledger(env);
+        let mut cumulative = 0;
+        if last_sweep == Some(now) {
+            cumulative = storage::get_cumulative_swept_this_ledger(env);
+        }
+        let new_cumulative = cumulative.checked_add(amount)
+            .unwrap_or_else(|| panic_with_error!(env, AdminError::SweepLedgerLimitExceeded));
+        if new_cumulative > max_sweep {
+            panic_with_error!(env, AdminError::SweepLedgerLimitExceeded);
+        }
+        storage::set_last_sweep_ledger(env, now);
+        storage::set_cumulative_swept_this_ledger(env, new_cumulative);
     }
     // Validation: check per-transaction cap (if configured)
     if let Some(cap) = storage::get_sweep_cap(env) {
@@ -602,6 +630,7 @@ fn calculate_protected_balance(env: &Env, asset: &Address) -> i128 {
 /// Set to None to disable cap. Admin must authorize.
 pub fn set_sweep_cap(env: &Env, cap: Option<i128>) {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     storage::set_sweep_cap(env, cap);
     emit_admin_action(env, &admin, "set_sweep_cap");
 }
@@ -611,6 +640,7 @@ pub fn set_sweep_cap(env: &Env, cap: Option<i128>) {
 /// Admin must authorize.
 pub fn set_sweep_notice_period(env: &Env, ledgers: u32) {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     storage::set_sweep_notice_period_ledgers(env, ledgers);
     emit_admin_action(env, &admin, "set_sweep_notice_period");
 }
@@ -628,6 +658,7 @@ pub struct MaxEvidenceCountUpdated {
 /// Reductions do NOT retroactively invalidate existing claims.
 pub fn set_max_evidence_count(env: &Env, new_count: u32) -> Result<(), AdminError> {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     if new_count > storage::MAX_EVIDENCE_COUNT_HARD_MAX {
         return Err(AdminError::MaxEvidenceCountOutOfBounds);
     }
@@ -654,6 +685,7 @@ pub struct GatewayAllowlistUpdated {
 /// Pass an empty vector to disable gateway validation (only `ipfs://` allowed).
 pub fn set_gateway_allowlist(env: &Env, gateways: Vec<String>) -> Result<(), AdminError> {
     let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     storage::set_gateway_allowlist(env, &gateways);
     GatewayAllowlistUpdated {
         gateway_count: gateways.len(),
@@ -678,6 +710,7 @@ pub struct MinEvidenceCountUpdated {
 /// Setting to 0 disables the minimum (default behaviour).
 pub fn set_min_evidence_count(env: &Env, new_min: u32) -> Result<(), AdminError> {
     let _admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     let current_max = storage::get_max_evidence_count(env);
     if new_min > current_max {
         return Err(AdminError::MinEvidenceExceedsMax);
@@ -707,6 +740,7 @@ pub struct MaxWeightCapUpdated {
 /// `new_cap` must be > 0. Falls back to `i128::MAX` (uncapped) when unset.
 pub fn set_max_weight_cap(env: &Env, new_cap: i128) -> Result<(), AdminError> {
     let _admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     if new_cap <= 0 {
         return Err(AdminError::InvalidMaxWeightCap);
     }
@@ -734,6 +768,7 @@ pub struct CooldownUpdated {
 /// 0 disables the cooldown (default). Does not affect claims already in `Processing`.
 pub fn set_cooldown_ledgers(env: &Env, new_ledgers: u32) -> Result<(), AdminError> {
     let _admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
     if new_ledgers > MAX_COOLDOWN_LEDGERS {
         return Err(AdminError::CooldownLedgersOutOfBounds);
     }
@@ -744,5 +779,73 @@ pub fn set_cooldown_ledgers(env: &Env, new_ledgers: u32) -> Result<(), AdminErro
         new_ledgers,
     }
     .publish(env);
+    Ok(())
+}
+
+// ── Governance cooldown (Issue #844) ──────────────────────────────────────
+
+/// Hard maximum for the governance cooldown window to prevent admin locking all parameters indefinitely.
+pub const MAX_GOVERNANCE_COOLDOWN_LEDGERS: u32 = 30 * crate::ledger::LEDGERS_PER_DAY; // ~30 days
+
+#[contractevent(topics = ["niffyinsure", "governance_cooldown_updated"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GovernanceCooldownUpdated {
+    pub old_ledgers: u32,
+    pub new_ledgers: u32,
+}
+
+pub fn check_and_update_gov_cooldown(env: &Env) {
+    let now = env.ledger().sequence();
+    let cooldown = storage::get_governance_cooldown_ledgers(env);
+    if cooldown > 0 {
+        if let Some(last_change) = storage::get_last_param_change_ledger(env) {
+            if now.saturating_sub(last_change) < cooldown {
+                panic_with_error!(env, AdminError::GovernanceCooldownActive);
+            }
+        }
+    }
+    storage::set_last_param_change_ledger(env, now);
+}
+
+pub fn set_governance_cooldown_ledgers(env: &Env, new_ledgers: u32) -> Result<(), AdminError> {
+    let admin = require_admin(env);
+    if new_ledgers > MAX_GOVERNANCE_COOLDOWN_LEDGERS {
+        return Err(AdminError::GovernanceCooldownOutOfBounds);
+    }
+    check_and_update_gov_cooldown(env);
+    let old_ledgers = storage::get_governance_cooldown_ledgers(env);
+    storage::set_governance_cooldown_ledgers(env, new_ledgers);
+    GovernanceCooldownUpdated {
+        old_ledgers,
+        new_ledgers,
+    }
+    .publish(env);
+    emit_admin_action(env, &admin, "set_governance_cooldown_ledgers");
+    Ok(())
+}
+
+// ── Treasury withdrawal limit (Issue #845) ────────────────────────────────
+
+#[contractevent(topics = ["niffyinsure", "max_sweep_per_ledger_updated"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MaxSweepPerLedgerUpdated {
+    pub old_cap: Option<i128>,
+    pub new_cap: i128,
+}
+
+pub fn set_max_sweep_per_ledger(env: &Env, cap: i128) -> Result<(), AdminError> {
+    let admin = require_admin(env);
+    check_and_update_gov_cooldown(env);
+    if cap <= 0 {
+        return Err(AdminError::MaxSweepPerLedgerOutOfBounds);
+    }
+    let old_cap = storage::get_max_sweep_per_ledger(env);
+    storage::set_max_sweep_per_ledger(env, cap);
+    MaxSweepPerLedgerUpdated {
+        old_cap,
+        new_cap: cap,
+    }
+    .publish(env);
+    emit_admin_action(env, &admin, "set_max_sweep_per_ledger");
     Ok(())
 }

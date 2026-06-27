@@ -40,6 +40,7 @@ import { V1SunsetInterceptor } from './common/versioning/v1-sunset.interceptor';
 import { RejectUnversionedApiMiddleware } from './common/versioning/reject-unversioned-api.middleware';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { PostsModule } from './posts/posts.module';
 
 /** Mutation routes that require idempotency key support (issue #363). */
 const IDEMPOTENCY_ROUTES = [
@@ -93,6 +94,7 @@ const IDEMPOTENCY_ROUTES = [
     ProfileModule,
     FeedsModule,
     AssetsModule,
+    PostsModule,
   ],
   controllers: [OracleHooksController, BetaCalculatorsController, XdrDecodeController],
   providers: [

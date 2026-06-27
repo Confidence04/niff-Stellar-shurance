@@ -434,3 +434,27 @@ model HolderProfile {
   @@index([lastSeenAt])
   @@map("holder_profiles")
 }
+
+/// Off-chain user-generated posts. Supports soft-delete via deletedAt.
+model Post {
+  id            Int        @id @default(autoincrement())
+  title         String     @db.VarChar(200)
+  body          String     @db.VarChar(10000)
+  status        PostStatus @default(DRAFT)
+  authorAddress String     @map("author_address")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  deletedAt     DateTime?  @map("deleted_at")
+
+  @@index([status])
+  @@index([authorAddress])
+  @@index([deletedAt])
+  @@index([createdAt, id]) // keyset pagination: ORDER BY createdAt DESC, id DESC
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}

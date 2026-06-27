@@ -20,6 +20,7 @@ export const ALLOWED_FLAG_KEYS = new Set([
   'ipfs_upload_enabled',
   'quote_simulation_cache_enabled',
   'experimental_beta_calculators',
+  'ENABLE_DEV_TOOLS',
 ]);
 
 @Injectable()

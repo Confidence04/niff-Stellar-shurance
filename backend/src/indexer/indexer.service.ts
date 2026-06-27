@@ -17,6 +17,7 @@ import { ClaimSummaryCacheService } from '../claims/services/claim-summary-cache
 import { VotePubSubService } from '../graphql/vote-pubsub.service';
 import { AdminAnalyticsService } from '../admin/admin-analytics.service';
 import { OutboundWebhookService } from '../webhooks/outbound-webhook.service';
+import { AllowedAssetsCacheService } from '../assets/allowed-assets-cache.service';
 
 type IndexerTx = Prisma.TransactionClient;
 type SorobanEvent = SorobanRpc.Api.EventResponse;
@@ -361,6 +362,10 @@ export class IndexerService {
         await this.handleClaimProcessed(tx, dataNative, event);
       } else if (mainTopic === 'niffyins' && subTopic === 'tbl_upd') {
         await this.handlePremiumTableUpdated();
+      } else if (mainTopic === 'asset' && subTopic === 'added') {
+        await this.handleAssetAdded(tx, dataNative, event);
+      } else if (mainTopic === 'asset' && subTopic === 'removed') {
+        await this.handleAssetRemoved(tx, dataNative, event);
       }
 
       await this.advanceCursorInTx(tx, network, event.ledger);
@@ -582,5 +587,40 @@ export class IndexerService {
   private async handlePremiumTableUpdated(): Promise<void> {
     await this.quoteSimulationCache?.invalidateAll();
     this.logger.log('Quote simulation cache invalidated after tbl_upd event');
+  }
+
+  private async handleAssetAdded(tx: IndexerTx, data: EventPayload, event: SorobanEvent) {
+    const contractId = getStringValue(data.contract_id);
+    const symbol = data.symbol != null ? getStringValue(data.symbol) : null;
+    const decimals = data.decimals != null ? getNumberValue(data.decimals) : 7;
+
+    await tx.allowedAsset.upsert({
+      where: { contractId },
+      create: {
+        contractId,
+        symbol,
+        decimals,
+        isAllowed: true,
+        addedAtLedger: event.ledger,
+      },
+      update: {
+        isAllowed: true,
+        symbol,
+        decimals,
+      },
+    });
+
+    await this.allowedAssetsCache?.invalidateAll();
+  }
+
+  private async handleAssetRemoved(tx: IndexerTx, data: EventPayload, event: SorobanEvent) {
+    const contractId = getStringValue(data.contract_id);
+
+    await tx.allowedAsset.update({
+      where: { contractId },
+      data: { isAllowed: false },
+    });
+
+    await this.allowedAssetsCache?.invalidateAll();
   }
 }

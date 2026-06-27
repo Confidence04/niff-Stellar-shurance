@@ -28,10 +28,12 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
 import { EventsModule } from './events/events.module';
 import { ProfileModule } from './profile/profile.module';
 import { FeedsModule } from './feeds/feeds.module';
+import { AssetsModule } from './assets/assets.module';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { AppLoggerService } from './common/logger/app-logger.service';
 import { OracleHooksController } from './experimental/oracle-hooks.controller';
 import { BetaCalculatorsController } from './experimental/beta-calculators.controller';
+import { XdrDecodeController } from './experimental/xdr-decode.controller';
 import { IdempotencyMiddleware } from './common/middleware/idempotency.middleware';
 import { DeprecationHeadersInterceptor } from './common/versioning/deprecation-headers.interceptor';
 import { V1SunsetInterceptor } from './common/versioning/v1-sunset.interceptor';
@@ -90,8 +92,9 @@ const IDEMPOTENCY_ROUTES = [
     EventsModule,
     ProfileModule,
     FeedsModule,
+    AssetsModule,
   ],
-  controllers: [OracleHooksController, BetaCalculatorsController],
+  controllers: [OracleHooksController, BetaCalculatorsController, XdrDecodeController],
   providers: [
     RequestContextMiddleware,
     AppLoggerService,

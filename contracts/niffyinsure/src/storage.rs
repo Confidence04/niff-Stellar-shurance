@@ -232,7 +232,15 @@ pub enum DataKey {
     SubscriptionCounter,
     Subscription(u64),
     OwnerSubscriptionIds(Address),
+    // ── Governance cooldown (Issue #844) ──────────────────────────────────────
+    GovernanceCooldownLedgers,
+    LastParamChangeLedger,
+    // ── Treasury withdrawal limit (Issue #845) ────────────────────────────────
+    MaxSweepPerLedger,
+    LastSweepLedger,
+    CumulativeSweptThisLedger,
 }
+
 pub fn has_open_claim(env: &Env, holder: &Address, policy_id: u32) -> bool {
     env.storage()
         .instance()
@@ -2006,3 +2014,70 @@ pub fn set_allowed_payout_recipient(env: &Env, recipient: &Address, allowed: boo
         &allowed,
     );
 }
+
+// ── Governance cooldown (Issue #844) ──────────────────────────────────────
+
+pub fn set_governance_cooldown_ledgers(env: &Env, ledgers: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::GovernanceCooldownLedgers, &ledgers);
+}
+
+pub fn get_governance_cooldown_ledgers(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::GovernanceCooldownLedgers)
+        .unwrap_or(0)
+}
+
+pub fn set_last_param_change_ledger(env: &Env, ledger: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::LastParamChangeLedger, &ledger);
+}
+
+pub fn get_last_param_change_ledger(env: &Env) -> Option<u32> {
+    env.storage()
+        .instance()
+        .get(&DataKey::LastParamChangeLedger)
+}
+
+// ── Treasury withdrawal limit (Issue #845) ────────────────────────────────
+
+pub fn set_max_sweep_per_ledger(env: &Env, cap: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::MaxSweepPerLedger, &cap);
+}
+
+pub fn get_max_sweep_per_ledger(env: &Env) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MaxSweepPerLedger)
+}
+
+pub fn set_last_sweep_ledger(env: &Env, ledger: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::LastSweepLedger, &ledger);
+}
+
+pub fn get_last_sweep_ledger(env: &Env) -> Option<u32> {
+    env.storage()
+        .instance()
+        .get(&DataKey::LastSweepLedger)
+}
+
+pub fn set_cumulative_swept_this_ledger(env: &Env, amount: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::CumulativeSweptThisLedger, &amount);
+}
+
+pub fn get_cumulative_swept_this_ledger(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&DataKey::CumulativeSweptThisLedger)
+        .unwrap_or(0)
+}
+

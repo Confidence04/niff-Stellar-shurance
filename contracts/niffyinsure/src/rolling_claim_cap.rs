@@ -120,6 +120,7 @@ pub fn remaining_under_cap(env: &Env, holder: &Address, policy_id: u32, now: u32
 }
 
 pub fn try_set_cap(env: &Env, new_cap: i128) -> Result<(), AdminError> {
+    crate::admin::check_and_update_gov_cooldown(env);
     if new_cap != i128::MAX && !(MIN_ROLLING_CLAIM_CAP..=MAX_ROLLING_CLAIM_CAP).contains(&new_cap) {
         return Err(AdminError::RollingClaimCapOutOfBounds);
     }
@@ -135,6 +136,7 @@ pub fn try_set_cap(env: &Env, new_cap: i128) -> Result<(), AdminError> {
 }
 
 pub fn try_set_window_ledgers(env: &Env, new_window: u32) -> Result<(), AdminError> {
+    crate::admin::check_and_update_gov_cooldown(env);
     if !(MIN_ROLLING_WINDOW_LEDGERS..=MAX_ROLLING_WINDOW_LEDGERS).contains(&new_window) {
         return Err(AdminError::RollingClaimWindowOutOfBounds);
     }
@@ -148,3 +150,4 @@ pub fn try_set_window_ledgers(env: &Env, new_window: u32) -> Result<(), AdminErr
     .publish(env);
     Ok(())
 }
+

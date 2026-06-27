@@ -360,6 +360,7 @@ impl NiffyInsure {
     ) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         let result = premium::update_multiplier_table(&env, &new_table);
         if result.is_ok() {
             admin::emit_admin_action(&env, &admin, "update_multiplier_table");
@@ -382,6 +383,7 @@ impl NiffyInsure {
     ) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         let result = premium::admin_set_premium_multiplier(&env, key, value);
         if result.is_ok() {
@@ -404,6 +406,7 @@ impl NiffyInsure {
         decimals: u32,
     ) {
         let admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         claim::set_allowed_asset(&env, &asset, allowed);
         AllowedAssetUpdated {
@@ -572,6 +575,7 @@ impl NiffyInsure {
     pub fn admin_set_vote_duration_ledgers(env: Env, ledgers: u32) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         ledger::validate_voting_duration_ledgers(ledgers)?;
         storage::set_voting_duration_ledgers(&env, ledgers);
         admin::emit_admin_action(&env, &admin, "admin_set_vote_duration_ledgers");
@@ -592,6 +596,7 @@ impl NiffyInsure {
     pub fn admin_set_quorum_bps(env: Env, quorum_bps: u32) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         validate::validate_quorum_bps(quorum_bps)?;
         let old = storage::get_quorum_bps(&env);
         storage::set_quorum_bps(&env, quorum_bps);
@@ -607,6 +612,7 @@ impl NiffyInsure {
     pub fn admin_set_protocol_fee_bps(env: Env, fee_bps: u32) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         validate::validate_protocol_fee_bps(fee_bps)?;
         let old = storage::get_protocol_fee_bps(&env);
@@ -622,6 +628,7 @@ impl NiffyInsure {
     pub fn admin_set_fee_recipient(env: Env, recipient: Address) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         let old = storage::get_fee_recipient(&env);
         storage::set_fee_recipient(&env, &recipient);
@@ -639,6 +646,7 @@ impl NiffyInsure {
     ) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         validate::validate_min_solvency_ratio_bps(ratio_bps)?;
         let old = storage::get_min_solvency_ratio_bps(&env);
@@ -833,6 +841,7 @@ impl NiffyInsure {
     pub fn set_calculator(env: Env, calculator: Address) {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         storage::set_calc_address(&env, &calculator);
         admin::emit_admin_action(&env, &admin, "set_calculator");
     }
@@ -840,6 +849,7 @@ impl NiffyInsure {
     pub fn clear_calculator(env: Env) {
         let admin = storage::get_admin(&env);
         admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
         env.storage()
             .instance()
             .remove(&storage::DataKey::CalcAddress);
@@ -855,6 +865,7 @@ impl NiffyInsure {
     /// Admin-only: upsert a region code in the registry.
     pub fn admin_set_region(env: Env, code: String, config: types::RegionConfig) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         let mut registry = storage::get_region_registry(&env);
         registry.set(code, config);
@@ -864,6 +875,7 @@ impl NiffyInsure {
     /// Admin-only: remove a region code from the registry.
     pub fn admin_remove_region(env: Env, code: String) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         let mut registry = storage::get_region_registry(&env);
         registry.remove(code);
@@ -899,6 +911,7 @@ impl NiffyInsure {
         specializations: Vec<types::Specialization>,
     ) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         storage::set_vet_specializations(&env, &vet, &specializations);
     }
@@ -1351,6 +1364,26 @@ impl NiffyInsure {
         storage::get_sweep_notice_period_ledgers(&env)
     }
 
+    /// Admin-only: set the governance cooldown window in ledgers after parameter changes.
+    pub fn admin_set_governance_cooldown_ledgers(env: Env, new_ledgers: u32) -> Result<(), AdminError> {
+        admin::set_governance_cooldown_ledgers(&env, new_ledgers)
+    }
+
+    /// Read-only: get the current governance cooldown window in ledgers.
+    pub fn get_governance_cooldown_ledgers(env: Env) -> u32 {
+        storage::get_governance_cooldown_ledgers(&env)
+    }
+
+    /// Admin-only: set the maximum cumulative amount that can be swept in a single ledger.
+    pub fn admin_set_max_sweep_per_ledger(env: Env, cap: i128) -> Result<(), AdminError> {
+        admin::set_max_sweep_per_ledger(&env, cap)
+    }
+
+    /// Read-only: get the maximum cumulative amount that can be swept in a single ledger (None if unset).
+    pub fn get_max_sweep_per_ledger(env: Env) -> Option<i128> {
+        storage::get_max_sweep_per_ledger(&env)
+    }
+
     /// Admin-only: set the maximum number of evidence entries per claim.
     /// Hard max is [`storage::MAX_EVIDENCE_COUNT_HARD_MAX`] (20).
     /// Reductions do NOT retroactively invalidate existing claims.
@@ -1427,6 +1460,7 @@ impl NiffyInsure {
         table: Option<types::MultiplierTable>,
     ) -> Result<(), validate::Error> {
         let admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         let result = premium::admin_set_asset_premium_table(&env, &asset, table);
         if result.is_ok() {
             admin::emit_admin_action(&env, &admin, "admin_set_asset_premium_table");
@@ -1692,6 +1726,7 @@ impl NiffyInsure {
         threshold: u32,
     ) -> Result<(), validate::Error> {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         if threshold > 100 {
             return Err(validate::Error::SafetyScoreOutOfRange);
         }
@@ -1702,6 +1737,7 @@ impl NiffyInsure {
     /// Admin: set the elevated quorum bps used when fraud score exceeds threshold.
     pub fn admin_set_elevated_quorum_bps(env: Env, bps: u32) -> Result<(), validate::Error> {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         validate::validate_quorum_bps(bps)?;
         storage::set_elevated_quorum_bps(&env, bps);
         Ok(())
@@ -1718,6 +1754,7 @@ impl NiffyInsure {
         max_claim_amount: i128,
     ) -> Result<(), validate::Error> {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         if min_claim_amount < 0 || max_claim_amount < min_claim_amount {
             return Err(validate::Error::ClaimAmountZero);
         }
@@ -1773,6 +1810,7 @@ impl NiffyInsure {
     /// When primary treasury is insufficient, overflow is drawn from this contract.
     pub fn admin_set_reinsurance_contract(env: Env, reinsurance: Address) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::set_reinsurance_contract(&env, &reinsurance);
         ReinsuranceContractUpdated {
             reinsurance_contract: reinsurance,
@@ -1783,6 +1821,7 @@ impl NiffyInsure {
     /// Admin: clear the reinsurance contract (disables reinsurance fallback).
     pub fn admin_clear_reinsurance_contract(env: Env) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::clear_reinsurance_contract(&env);
     }
 
@@ -1801,6 +1840,7 @@ impl NiffyInsure {
     /// Admin: enable or disable KYC whitelist enforcement for initiate_policy calls.
     pub fn admin_set_whitelist_enabled(env: Env, enabled: bool) {
         let _admin = admin::require_admin(&env);
+        admin::check_and_update_gov_cooldown(&env);
         storage::bump_instance(&env);
         storage::set_whitelist_enabled(&env, enabled);
         WhitelistToggled { enabled }.publish(&env);

@@ -665,6 +665,7 @@ pub struct GracePeriodUpdated {
 
 pub fn set_grace_period_ledgers(env: &Env, ledgers: u32) -> Result<(), RenewalError> {
     let admin = crate::admin::require_admin(env);
+    crate::admin::check_and_update_gov_cooldown(env);
     if !ledger::is_valid_grace_period_ledgers(ledgers) {
         return Err(RenewalError::GracePeriodOutOfBounds);
     }

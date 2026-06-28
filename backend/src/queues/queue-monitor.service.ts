@@ -2,9 +2,29 @@ import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/commo
 import { Queue, Worker, Job } from 'bullmq';
 import { getBullMQConnection } from '../redis/client';
 import { MetricsService } from '../metrics/metrics.service';
+import { getQueueRetryConfig } from './queue-config';
+import { QueueName } from './names';
 
-// Max retries before a job lands in the failed (dead-letter) set
+// Fallback max-attempts for queues not in the canonical QueueName list.
+// Exported for use in tests.
 export const DLQ_MAX_ATTEMPTS = 5;
+const FALLBACK_MAX_ATTEMPTS = DLQ_MAX_ATTEMPTS;
+
+function resolveMaxAttempts(name: string): number {
+  try {
+    return getQueueRetryConfig(name as QueueName).maxAttempts;
+  } catch {
+    return FALLBACK_MAX_ATTEMPTS;
+  }
+}
+
+function resolveBackoff(name: string): { type: 'exponential'; delay: number } {
+  try {
+    return getQueueRetryConfig(name as QueueName).backoff;
+  } catch {
+    return { type: 'exponential', delay: 2_000 };
+  }
+}
 
 export const QUEUE_CONFIGS = [
   { name: 'indexer', label: 'indexer' },
@@ -25,11 +45,13 @@ export class QueueMonitorService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit() {
     for (const cfg of QUEUE_CONFIGS) {
+      const maxAttempts = resolveMaxAttempts(cfg.name);
+      const backoff = resolveBackoff(cfg.name);
       const q = new Queue(cfg.name, {
         connection: getBullMQConnection(),
         defaultJobOptions: {
-          attempts: DLQ_MAX_ATTEMPTS,
-          backoff: { type: 'exponential', delay: 2_000 },
+          attempts: maxAttempts,
+          backoff,
           removeOnComplete: { count: 100 },
           removeOnFail: { count: 500 },
         },
@@ -44,7 +66,8 @@ export class QueueMonitorService implements OnModuleInit, OnModuleDestroy {
       });
       w.on('failed', (job: Job | undefined, err: Error) => {
         if (!job) return;
-        const isExhausted = (job.attemptsMade ?? 0) >= DLQ_MAX_ATTEMPTS;
+        const attempts = job.attemptsMade ?? 0;
+        const isExhausted = attempts >= maxAttempts;
         if (isExhausted) {
           const reason = err?.message?.slice(0, 120) ?? 'unknown';
           this.metrics.dlqJobFailed.inc({
@@ -55,6 +78,9 @@ export class QueueMonitorService implements OnModuleInit, OnModuleDestroy {
           this.logger.warn(
             `[DLQ] job ${job.id} (${job.name}) exhausted retries on queue "${cfg.name}": ${reason}`,
           );
+        } else if (attempts > 0) {
+          // Intermediate failure — job will be retried.
+          this.metrics.recordJobRetry({ queue: cfg.name, jobName: job.name });
         }
       });
       this.workers.push(w);

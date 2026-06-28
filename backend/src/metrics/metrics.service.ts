@@ -32,6 +32,7 @@ export class MetricsService implements OnModuleInit {
   readonly dlqDepth: client.Gauge<string>;
   readonly dlqJobFailed: client.Counter<string>;
   readonly queueActiveWorkers: client.Gauge<string>;
+  readonly bullmqJobRetriesTotal: client.Counter<string>;
 
   // ── Indexer / observability metrics ───────────────────────────────────────
   readonly indexerLag: client.Gauge<string>;
@@ -148,6 +149,13 @@ export class MetricsService implements OnModuleInit {
       name: 'bullmq_queue_active_workers',
       help: 'Number of active workers for a queue (jobs being processed)',
       labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.bullmqJobRetriesTotal = new client.Counter({
+      name: 'bullmq_job_retries_total',
+      help: 'Total job retry attempts per queue (excludes first attempt and final exhaustion)',
+      labelNames: ['queue', 'job_name'],
       registers: [this.registry],
     });
 
@@ -410,6 +418,10 @@ export class MetricsService implements OnModuleInit {
 
   recordVoteReconciliationMismatchCount(count: number) {
     this.voteReconciliationMismatchCount.inc({}, count);
+  }
+
+  recordJobRetry(opts: { queue: string; jobName: string }) {
+    this.bullmqJobRetriesTotal.inc({ queue: opts.queue, job_name: opts.jobName });
   }
 
   async getMetrics(): Promise<string> {

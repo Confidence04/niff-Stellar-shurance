@@ -129,6 +129,8 @@ pub enum Error {
     CommitmentNotFound = 78,
     /// Revealed vote does not match the prior commitment hash.
     CommitmentMismatch = 79,
+    /// Evidence array contains a duplicate (url, hash) pair.
+    DuplicateEvidence = 80,
 }
 
 pub fn check_claim_evidence_update(
@@ -250,7 +252,17 @@ pub fn check_claim_fields(
         // Validate evidence URL format
         validate_evidence_url(env, &entry.url)?;
     }
-    let _ = env;
+    // Reject duplicate (url, hash) pairs within the same submission.
+    let n = evidence.len();
+    for i in 0..n {
+        let a = evidence.get(i).unwrap();
+        for j in (i + 1)..n {
+            let b = evidence.get(j).unwrap();
+            if a.url == b.url && a.hash == b.hash {
+                return Err(Error::DuplicateEvidence);
+            }
+        }
+    }
     Ok(())
 }
 

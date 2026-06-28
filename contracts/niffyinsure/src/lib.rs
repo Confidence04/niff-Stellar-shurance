@@ -349,6 +349,7 @@ impl NiffyInsure {
             55 => validate::Error::PayoutDeadlineNotReached,
             56 => validate::Error::InsufficientEvidence,
             57 => validate::Error::CooldownActive,
+            80 => validate::Error::DuplicateEvidence,
             _ => validate::Error::ClaimNotApproved,
         };
         policy::map_quote_error(&env, err)

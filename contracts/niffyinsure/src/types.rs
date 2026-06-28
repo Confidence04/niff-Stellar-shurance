@@ -752,6 +752,19 @@ pub struct PremiumQuote {
     pub config_version: u32,
 }
 
+/// Human-readable identity information returned by `get_contract_metadata`.
+///
+/// All fields are compile-time constants; no storage reads occur on the call path.
+/// Safe to call via simulation without authentication.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractMetadata {
+    pub name: String,
+    pub version: String,
+    /// Short hint identifying the target Stellar network (non-binding, for tooling convenience).
+    pub network_passphrase_hint: String,
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ORACLE / PARAMETRIC TRIGGER STUBS
 //

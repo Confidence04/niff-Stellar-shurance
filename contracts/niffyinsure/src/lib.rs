@@ -225,6 +225,16 @@ impl NiffyInsure {
         soroban_sdk::String::from_str(&env, env!("CARGO_PKG_VERSION"))
     }
 
+    /// Returns human-readable contract identity: name, version, and network hint.
+    /// All fields are compile-time constants. No storage reads, no auth required.
+    pub fn get_contract_metadata(env: Env) -> types::ContractMetadata {
+        types::ContractMetadata {
+            name: soroban_sdk::String::from_str(&env, env!("CARGO_PKG_NAME")),
+            version: soroban_sdk::String::from_str(&env, env!("CARGO_PKG_VERSION")),
+            network_passphrase_hint: soroban_sdk::String::from_str(&env, "Stellar Testnet"),
+        }
+    }
+
     /// Read-only: on-chain WASM hash for this deployed contract.
     /// The returned value is the canonical hash used by the deployment registry and RPC tooling.
     pub fn get_wasm_hash(env: Env) -> soroban_sdk::BytesN<32> {

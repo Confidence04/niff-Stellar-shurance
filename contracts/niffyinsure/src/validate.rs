@@ -131,6 +131,8 @@ pub enum Error {
     CommitmentMismatch = 79,
     /// Evidence array contains a duplicate (url, hash) pair.
     DuplicateEvidence = 80,
+    /// Requested page_size exceeds the hard cap for this query.
+    PageSizeTooLarge = 81,
 }
 
 pub fn check_claim_evidence_update(

@@ -360,6 +360,7 @@ impl NiffyInsure {
             56 => validate::Error::InsufficientEvidence,
             57 => validate::Error::CooldownActive,
             80 => validate::Error::DuplicateEvidence,
+            81 => validate::Error::PageSizeTooLarge,
             _ => validate::Error::ClaimNotApproved,
         };
         policy::map_quote_error(&env, err)
@@ -1181,6 +1182,42 @@ impl NiffyInsure {
     /// Read-only: number of active policies for a holder (= vote weight).
     pub fn get_active_policy_count(env: Env, holder: Address) -> u32 {
         storage::get_active_policy_count(&env, &holder)
+    }
+
+    /// Read-only (simulation-only): paginated list of inactive/expired policies for a holder.
+    ///
+    /// Returns policies where `is_active == false` or `current_ledger > end_ledger`.
+    /// `page` is zero-indexed; `page_size` is hard-capped at
+    /// [`types::INACTIVE_POLICIES_PAGE_SIZE_MAX`] — exceeding it reverts.
+    /// An empty result means no more inactive policies exist after the requested offset.
+    pub fn get_inactive_policies(
+        env: Env,
+        holder: Address,
+        page: u32,
+        page_size: u32,
+    ) -> Result<Vec<types::Policy>, validate::Error> {
+        if page_size > types::INACTIVE_POLICIES_PAGE_SIZE_MAX {
+            panic_with_error!(&env, validate::Error::PageSizeTooLarge);
+        }
+        let now = env.ledger().sequence();
+        let total = storage::get_policy_counter(&env, &holder);
+        let skip = page.saturating_mul(page_size);
+        let mut skipped: u32 = 0;
+        let mut results: Vec<types::Policy> = Vec::new(&env);
+        let mut id: u32 = 1;
+        while id <= total && results.len() < page_size {
+            if let Some(p) = storage::get_policy(&env, &holder, id) {
+                if !p.is_active || now > p.end_ledger {
+                    if skipped < skip {
+                        skipped = skipped.saturating_add(1);
+                    } else {
+                        results.push_back(p);
+                    }
+                }
+            }
+            id = id.saturating_add(1);
+        }
+        Ok(results)
     }
 
     /// Read-only: current replay-protection nonce for `holder`.

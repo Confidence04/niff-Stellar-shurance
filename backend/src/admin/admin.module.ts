@@ -19,6 +19,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { CacheModule } from '../cache/cache.module';
 import { RpcModule } from '../rpc/rpc.module';
 import { SupportModule } from '../support/support.module';
+import { CommentRepository } from '../claims/comments/comment.repository';
 
 @Module({
   imports: [
@@ -37,7 +38,7 @@ import { SupportModule } from '../support/support.module';
     }),
   ],
   controllers: [AdminController],
-  providers: [AdminService, AdminPoliciesService, AdminClaimsExportService, AdminTenantsService, AdminStatsService, AdminAnalyticsService, AuditService, QueueMonitorService],
+  providers: [AdminService, AdminPoliciesService, AdminClaimsExportService, AdminTenantsService, AdminStatsService, AdminAnalyticsService, AuditService, QueueMonitorService, CommentRepository],
   exports: [AuditService, QueueMonitorService],
 })
 export class AdminModule implements NestModule {

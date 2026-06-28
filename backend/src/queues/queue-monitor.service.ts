@@ -11,19 +11,11 @@ export const DLQ_MAX_ATTEMPTS = 5;
 const FALLBACK_MAX_ATTEMPTS = DLQ_MAX_ATTEMPTS;
 
 function resolveMaxAttempts(name: string): number {
-  try {
-    return getQueueRetryConfig(name as QueueName).maxAttempts;
-  } catch {
-    return FALLBACK_MAX_ATTEMPTS;
-  }
+  return getQueueRetryConfig(name as QueueName)?.maxAttempts ?? FALLBACK_MAX_ATTEMPTS;
 }
 
 function resolveBackoff(name: string): { type: 'exponential'; delay: number } {
-  try {
-    return getQueueRetryConfig(name as QueueName).backoff;
-  } catch {
-    return { type: 'exponential', delay: 2_000 };
-  }
+  return getQueueRetryConfig(name as QueueName)?.backoff ?? { type: 'exponential', delay: 2_000 };
 }
 
 export const QUEUE_CONFIGS = [

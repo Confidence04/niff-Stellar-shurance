@@ -32,10 +32,12 @@ export class MetricsService implements OnModuleInit {
   readonly dlqDepth: client.Gauge<string>;
   readonly dlqJobFailed: client.Counter<string>;
   readonly queueActiveWorkers: client.Gauge<string>;
+  readonly bullmqJobRetriesTotal: client.Counter<string>;
 
   // ── Indexer / observability metrics ───────────────────────────────────────
   readonly indexerLag: client.Gauge<string>;
   readonly indexerLedgerGap: client.Gauge<string>;
+  readonly indexerLastLedgerAge: client.Gauge<string>;
   readonly solvencyBufferStroops: client.Gauge<string>;
   readonly solvencyBufferThresholdStroops: client.Gauge<string>;
 
@@ -151,6 +153,13 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.bullmqJobRetriesTotal = new client.Counter({
+      name: 'bullmq_job_retries_total',
+      help: 'Total job retry attempts per queue (excludes first attempt and final exhaustion)',
+      labelNames: ['queue', 'job_name'],
+      registers: [this.registry],
+    });
+
     this.indexerLag = new client.Gauge({
       name: 'indexer_lag_ledgers',
       help: 'Current indexer lag in ledger count behind the network head',
@@ -158,6 +167,13 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
     this.indexerLedgerGap = new client.Gauge({      name: 'indexer_ledger_gap',      help: 'Gap between latest chain ledger and last processed ledger',      labelNames: ['network'],      registers: [this.registry],    });
+
+    this.indexerLastLedgerAge = new client.Gauge({
+      name: 'indexer_last_processed_ledger_age_seconds',
+      help: 'Seconds since the close time of the last ledger processed by the indexer',
+      labelNames: ['network'],
+      registers: [this.registry],
+    });
 
     this.solvencyBufferStroops = new client.Gauge({
       name: 'solvency_buffer_stroops',
@@ -361,6 +377,11 @@ export class MetricsService implements OnModuleInit {
   }
   recordIndexerLedgerGap(opts: { network: string; gap: number }) {    this.indexerLedgerGap.set({ network: opts.network }, opts.gap);  }
 
+  recordLastProcessedLedgerAge(opts: { network: string; ledgerClosedAt: Date }) {
+    const ageSeconds = (Date.now() - opts.ledgerClosedAt.getTime()) / 1000;
+    this.indexerLastLedgerAge.set({ network: opts.network }, Math.max(0, ageSeconds));
+  }
+
   recordSolvencyBuffer(opts: { tenant: string; bufferStroops: bigint }) {
     this.solvencyBufferStroops.set({ tenant: opts.tenant }, Number(opts.bufferStroops));
   }
@@ -410,6 +431,10 @@ export class MetricsService implements OnModuleInit {
 
   recordVoteReconciliationMismatchCount(count: number) {
     this.voteReconciliationMismatchCount.inc({}, count);
+  }
+
+  recordJobRetry(opts: { queue: string; jobName: string }) {
+    this.bullmqJobRetriesTotal.inc({ queue: opts.queue, job_name: opts.jobName });
   }
 
   async getMetrics(): Promise<string> {

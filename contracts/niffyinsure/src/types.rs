@@ -434,16 +434,22 @@ pub struct InitiatePolicyOptions {
     pub metadata_uri: String,
     /// Optional region code validated against the admin-managed region registry.
     pub region_code: Option<String>,
+    /// SHA-256 hash of the insurance terms document in effect at bind time.
+    /// Must be non-zero (all-zero digest is rejected as uninitialized).
+    pub terms_hash: BytesN<32>,
 }
 
 impl InitiatePolicyOptions {
     pub fn test_defaults(env: &Env) -> Self {
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes[0] = 1; // non-zero sentinel for tests
         Self {
             beneficiary: None,
             deductible: None,
             expected_nonce: None,
             metadata_uri: String::from_str(env, "ipfs://test-policy"),
             region_code: None,
+            terms_hash: BytesN::from_array(env, &hash_bytes),
         }
     }
 }
@@ -649,6 +655,15 @@ pub struct Policy {
     /// Off-chain URI to the policy governing document.
     /// Must be non-empty at policy creation. Admin can update via `update_policy_metadata_uri`.
     pub metadata_uri: String,
+    /// SHA-256 hash of the insurance terms document in effect at bind time.
+    ///
+    /// Commits the policy to an exact version of the coverage conditions and exclusions.
+    /// Stored at `initiate_policy` time and immutable thereafter — no entrypoint modifies it.
+    /// Must be non-zero (all-zero hash is rejected as an uninitialized value sentinel).
+    ///
+    /// Off-chain verification: download the terms document at `metadata_uri` and compare its
+    /// SHA-256 digest against this field to confirm the on-chain commitment matches.
+    pub terms_hash: BytesN<32>,
 }
 
 /// Return value of [`crate::policy::renew_policy`].

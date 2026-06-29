@@ -5,7 +5,7 @@ use crate::{
     types::{ClaimStatus, Policy, PolicyType, RegionTier, TerminationReason},
     validate,
 };
-use soroban_sdk::{contracterror, contractevent, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, String};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -76,6 +76,12 @@ pub fn initiate_policy(
         terminated_by_admin: false,
         strike_count: 0,
         metadata_uri: String::from_str(env, ""),
+        // policy_lifecycle bindings are legacy/internal; use a non-zero sentinel.
+        terms_hash: BytesN::from_array(env, &{
+            let mut b = [0u8; 32];
+            b[0] = 1;
+            b
+        }),
     };
 
     validate::check_policy(&policy).map_err(|e| match e {

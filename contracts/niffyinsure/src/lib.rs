@@ -1072,6 +1072,7 @@ impl NiffyInsure {
             opts.expected_nonce,
             opts.metadata_uri,
             opts.region_code,
+            opts.terms_hash,
         )
     }
 
@@ -1365,7 +1366,7 @@ impl NiffyInsure {
     }
 
     /// Admin-only: set the governance cooldown window in ledgers after parameter changes.
-    pub fn admin_set_governance_cooldown_ledgers(env: Env, new_ledgers: u32) -> Result<(), AdminError> {
+    pub fn admin_set_gov_cooldown_ledgers(env: Env, new_ledgers: u32) -> Result<(), AdminError> {
         admin::set_governance_cooldown_ledgers(&env, new_ledgers)
     }
 
@@ -2039,6 +2040,9 @@ impl NiffyInsure {
     ) {
         use crate::types::{Policy, PolicyType, RegionTier, TerminationReason};
         let token = storage::get_token(&env);
+        // Non-zero terms_hash sentinel for test policies.
+        let mut hash_bytes = [0u8; 32];
+        hash_bytes[0] = 1;
         let policy = Policy {
             holder: holder.clone(),
             policy_id,
@@ -2057,6 +2061,7 @@ impl NiffyInsure {
             terminated_by_admin: false,
             strike_count: 0,
             metadata_uri: String::from_str(&env, "ipfs://test-policy-metadata"),
+            terms_hash: soroban_sdk::BytesN::from_array(&env, &hash_bytes),
         };
         let key = storage::DataKey::Policy(holder.clone(), policy_id);
         env.storage().persistent().set(&key, &policy);

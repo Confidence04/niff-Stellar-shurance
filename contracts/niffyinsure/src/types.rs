@@ -78,6 +78,9 @@ pub const PROTOCOL_FEE_BPS_MAX: u32 = 1_000;
 pub const MIN_SOLVENCY_RATIO_BPS_MIN: u32 = 0;
 pub const MIN_SOLVENCY_RATIO_BPS_MAX: u32 = 100_000;
 
+/// Hard cap on `page_size` for `get_inactive_policies`.
+pub const INACTIVE_POLICIES_PAGE_SIZE_MAX: u32 = 20;
+
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
 #[contracttype]
@@ -750,6 +753,19 @@ pub struct PremiumQuote {
     pub line_items: Option<Vec<PremiumQuoteLineItem>>,
     pub valid_until_ledger: u32,
     pub config_version: u32,
+}
+
+/// Human-readable identity information returned by `get_contract_metadata`.
+///
+/// All fields are compile-time constants; no storage reads occur on the call path.
+/// Safe to call via simulation without authentication.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContractMetadata {
+    pub name: String,
+    pub version: String,
+    /// Short hint identifying the target Stellar network (non-binding, for tooling convenience).
+    pub network_passphrase_hint: String,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

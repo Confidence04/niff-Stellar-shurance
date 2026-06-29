@@ -19,7 +19,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, Min, ArrayNotEmpty, Matches, IsIn } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min, ArrayNotEmpty, Matches, IsIn } from 'class-validator';
 import { ClaimSeverity } from '@prisma/client';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
@@ -46,6 +46,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SorobanService } from '../rpc/soroban.service';
 import { TokenBlacklistService } from '../auth/token-blacklist.service';
 import { SupportService } from '../support/support.service';
+import { CommentRepository } from '../claims/comments/comment.repository';
 
 class BatchRegisterVotersDto {
   @IsArray()
@@ -82,6 +83,13 @@ class SetClaimSeverityDto {
 class RevokeTokenDto {
   @IsString() jti!: string;
   @IsInt() expiresAt!: number;
+}
+
+class AdminDeleteCommentDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 class AssignTicketDto {
@@ -126,6 +134,7 @@ export class AdminController {
     private readonly sorobanService: SorobanService,
     private readonly tokenBlacklist: TokenBlacklistService,
     private readonly supportService: SupportService,
+    private readonly commentRepository: CommentRepository,
   ) {}
 
   // ── Governance: Voters ────────────────────────────────────────────
@@ -904,6 +913,46 @@ export class AdminController {
     });
 
     return { claimId: id, severity: updated.severity };
+  }
+
+  /**
+   * GET /admin/claims/:id/comments
+   *
+   * List all comments for a claim, including soft-deleted ones (admin view).
+   */
+  @Get('claims/:id/comments')
+  @MinAdminRole('viewer')
+  @ApiOperation({ summary: 'List all comments for a claim including soft-deleted (admin view)' })
+  async listClaimCommentsAdmin(@Param('id', ParseIntPipe) claimId: number) {
+    return this.commentRepository.findAll(claimId);
+  }
+
+  /**
+   * DELETE /admin/claims/:id/comments/:commentId
+   *
+   * Admin soft-delete of a comment. Records an audit log entry with the reason.
+   */
+  @Delete('claims/:id/comments/:commentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Admin soft-delete a claim comment with audit log' })
+  async adminDeleteComment(
+    @Param('id', ParseIntPipe) claimId: number,
+    @Param('commentId') commentId: string,
+    @Body() dto: AdminDeleteCommentDto,
+    @Req() req: AdminRequest,
+  ): Promise<void> {
+    const comment = await this.commentRepository.findById(commentId);
+    if (!comment || comment.deletedAt !== null) {
+      throw new NotFoundException('Comment not found');
+    }
+    await this.commentRepository.softDelete(commentId);
+    const actor = req.user?.walletAddress ?? 'unknown';
+    await this.auditService.write({
+      actor,
+      action: 'admin_delete_comment',
+      payload: { commentId, claimId, reason: dto.reason ?? null },
+      ipAddress: req.ip,
+    });
   }
 
   /**

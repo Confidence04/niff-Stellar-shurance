@@ -13,6 +13,7 @@ import { useLatestLedger } from '@/hooks/use-latest-ledger'
 import { DeadlineCountdown } from './DeadlineCountdown'
 import { QuorumProgressBar } from './QuorumProgressBar'
 import { ClaimVotePanel } from './claim-vote-panel'
+import { FraudScoreBadge } from './FraudScoreBadge'
 
 interface ClaimDetailViewProps {
   claimId: string
@@ -115,6 +116,9 @@ export function ClaimDetailView({ claimId }: ClaimDetailViewProps) {
                   <Badge variant={getStatusVariant(claim.metadata.status)}>
                     {formatStatusLabel(claim.metadata.status)}
                   </Badge>
+                  {claim.fraud_score !== undefined && (
+                    <FraudScoreBadge score={claim.fraud_score} />
+                  )}
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Filed by {claim.metadata.creatorAddress} on {formatTimestamp(claim.metadata.createdAt)}

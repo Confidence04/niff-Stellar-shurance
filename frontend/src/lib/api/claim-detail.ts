@@ -83,6 +83,7 @@ export const ClaimDetailResponseSchema = z.object({
   userHasVoted: z.boolean().optional(),
   userVote: z.enum(['yes', 'no']).optional(),
   payout_deadline_ledger: z.number().optional(),
+  fraud_score: z.number().optional(),
 })
 
 export type DisputeInfo = z.infer<typeof DisputeInfoSchema>

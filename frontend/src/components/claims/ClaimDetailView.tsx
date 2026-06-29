@@ -13,6 +13,7 @@ import { useLatestLedger } from '@/hooks/use-latest-ledger'
 import { DeadlineCountdown } from './DeadlineCountdown'
 import { QuorumProgressBar } from './QuorumProgressBar'
 import { ClaimVotePanel } from './claim-vote-panel'
+import { ClaimVotersPanel } from './ClaimVotersPanel'
 import { FraudScoreBadge } from './FraudScoreBadge'
 
 interface ClaimDetailViewProps {
@@ -416,6 +417,8 @@ export function ClaimDetailView({ claimId }: ClaimDetailViewProps) {
             <ClaimVotePanel claimId={claimId} />
           </CardContent>
         </Card>
+
+        <ClaimVotersPanel claimId={claimId} />
 
         <Card>
           <CardHeader>

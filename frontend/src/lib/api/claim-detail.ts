@@ -92,6 +92,25 @@ export type AppealInfo = z.infer<typeof AppealInfoSchema>
 
 export type ClaimDetailResponse = z.infer<typeof ClaimDetailResponseSchema>
 
+export const ClaimVoterSchema = z.object({
+  walletAddress: z.string(),
+  displayName: z.string().optional(),
+  voted: z.boolean(),
+  vote: z.enum(['yes', 'no']).optional(),
+})
+
+export type ClaimVoter = z.infer<typeof ClaimVoterSchema>
+
+export async function fetchClaimVoters(claimId: string): Promise<ClaimVoter[]> {
+  const response = await fetch(`/api/claims/${encodeURIComponent(claimId)}/voters`)
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({ message: 'Failed to load voters' }))
+    throw new Error(errorBody.message ?? 'Failed to load voters')
+  }
+  const data = await response.json()
+  return z.array(ClaimVoterSchema).parse(data)
+}
+
 export async function fetchClaimDetail(claimId: string): Promise<ClaimDetailResponse> {
   const response = await fetch(`/api/claims/${encodeURIComponent(claimId)}`)
   if (!response.ok) {

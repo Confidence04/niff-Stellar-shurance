@@ -14,6 +14,7 @@ import {
   ClaimDetailResponseDto,
   ClaimsListResponseDto,
 } from './dto/claim.dto';
+import { ClaimVoterDto } from './dto/claim-voter.dto';
 import {
   buildKeysetWhere,
   buildNextCursor,
@@ -210,6 +211,33 @@ export class ClaimsService {
     }
 
     return this.enrichWithUserVote(response, walletAddress);
+  }
+
+  async getClaimVoters(claimId: number): Promise<ClaimVoterDto[]> {
+    const readClient = this.getReadClient();
+    const [registeredVoters, votes] = await Promise.all([
+      readClient.registeredVoter.findMany(),
+      readClient.vote.findMany({
+        where: { claimId, deletedAt: null },
+        select: { voterAddress: true, vote: true },
+      }),
+    ]);
+
+    const voteMap = new Map<string, 'APPROVE' | 'REJECT'>();
+    for (const v of votes) {
+      voteMap.set(v.voterAddress.toLowerCase(), v.vote);
+    }
+
+    return registeredVoters.map((voter) => {
+      const normalized = voter.walletAddress.toLowerCase();
+      const dbVote = voteMap.get(normalized);
+      return {
+        walletAddress: voter.walletAddress,
+        displayName: voter.displayName ?? undefined,
+        voted: !!dbVote,
+        vote: dbVote === 'APPROVE' ? 'yes' : dbVote === 'REJECT' ? 'no' : undefined,
+      };
+    });
   }
 
   async getClaimsByPolicyIds(

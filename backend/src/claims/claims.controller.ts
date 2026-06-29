@@ -29,6 +29,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ClaimsService } from './claims.service';
 import { ClaimsListResponseDto, ClaimDetailResponseDto } from './dto/claim.dto';
+import { ClaimVoterDto } from './dto/claim-voter.dto';
 import { BuildClaimTransactionDto } from './dto/build-claim-transaction.dto';
 import { SubmitTransactionDto } from './dto/submit-transaction.dto';
 import { EvidenceUploadService } from './services/evidence-upload.service';
@@ -155,6 +156,16 @@ export class ClaimsController {
     @WalletAddress() walletAddress?: string,
   ): Promise<ClaimDetailResponseDto> {
     return this.claimsService.getClaimById(id, walletAddress);
+  }
+
+  @Get(':id/voters')
+  @ApiOperation({ summary: 'List eligible voters with vote status for a claim' })
+  @ApiResponse({ status: 200, description: 'Voters with vote status', type: [ClaimVoterDto] })
+  @ApiResponse({ status: 404, description: 'Claim not found' })
+  async getClaimVoters(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ClaimVoterDto[]> {
+    return this.claimsService.getClaimVoters(id);
   }
 
   @Post(':id/evidence/metadata')

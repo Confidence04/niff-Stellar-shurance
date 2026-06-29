@@ -129,6 +129,10 @@ pub enum Error {
     CommitmentNotFound = 78,
     /// Revealed vote does not match the prior commitment hash.
     CommitmentMismatch = 79,
+    /// Escalation deadline must be strictly in the future (> current ledger).
+    EscalationDeadlineNotFuture = 80,
+    /// Escalation deadline must be strictly earlier than the current voting deadline.
+    EscalationDeadlineNotEarlier = 81,
 }
 
 pub fn check_claim_evidence_update(

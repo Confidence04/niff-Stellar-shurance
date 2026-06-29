@@ -1807,3 +1807,64 @@ fn finalize_appeal_outcome(
     }
     .publish(env);
 }
+
+// ── Issue #841: Claim escalation entrypoint ───────────────────────────────────
+
+/// Emitted when admin escalates a stalled claim to a shorter voting deadline.
+///
+/// Topic layout: ["niffyinsure", "claim_escalated", claim_id]
+#[contractevent(topics = ["niffyinsure", "claim_escalated"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimEscalated {
+    #[topic]
+    pub claim_id: u64,
+    pub old_deadline_ledger: u32,
+    pub new_deadline_ledger: u32,
+    pub at_ledger: u32,
+}
+
+/// Admin-only: reduce the voting deadline of a stalled `Processing` claim.
+///
+/// Invariants enforced:
+/// - Claim must be in `Processing` status.
+/// - `new_deadline_ledger` must be strictly earlier than the current deadline.
+/// - `new_deadline_ledger` must be strictly in the future (`> now`).
+///
+/// Auth: caller must be the contract admin (enforced at the lib.rs entrypoint).
+pub fn escalate_claim(
+    env: &Env,
+    claim_id: u64,
+    new_deadline_ledger: u32,
+) -> Result<(), Error> {
+    let mut claim = storage::get_claim(env, claim_id).ok_or(Error::ClaimNotFound)?;
+
+    if claim.status != ClaimStatus::Processing {
+        return Err(Error::ClaimNotProcessing);
+    }
+
+    let now = env.ledger().sequence();
+
+    // New deadline must be in the future.
+    if new_deadline_ledger <= now {
+        return Err(Error::EscalationDeadlineNotFuture);
+    }
+
+    // New deadline must be strictly earlier than the current deadline.
+    if new_deadline_ledger >= claim.voting_deadline_ledger {
+        return Err(Error::EscalationDeadlineNotEarlier);
+    }
+
+    let old_deadline = claim.voting_deadline_ledger;
+    claim.voting_deadline_ledger = new_deadline_ledger;
+    storage::set_claim(env, &claim);
+
+    ClaimEscalated {
+        claim_id,
+        old_deadline_ledger: old_deadline,
+        new_deadline_ledger,
+        at_ledger: now,
+    }
+    .publish(env);
+
+    Ok(())
+}

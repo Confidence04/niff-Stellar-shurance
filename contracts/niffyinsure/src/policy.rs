@@ -329,6 +329,8 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::RevealPhaseEnded => "reveal phase has ended for this claim",
         Error::CommitmentNotFound => "no vote commitment found for this voter",
         Error::CommitmentMismatch => "revealed vote does not match the prior commitment",
+        Error::EscalationDeadlineNotFuture => "escalation deadline must be in the future",
+        Error::EscalationDeadlineNotEarlier => "escalation deadline must be earlier than the current voting deadline",
     };
     QuoteFailure {
         code: err as u32,

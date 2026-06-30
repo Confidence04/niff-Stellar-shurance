@@ -21,6 +21,59 @@ export const openapiSpec = {
     { name: "Posts", description: "User-generated posts (CRUD)" },
   ],
   paths: {
+    "/claims/{id}/timeline": {
+      get: {
+        summary: "Get claim status-transition timeline",
+        operationId: "getClaimTimeline",
+        tags: ["Claims"],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            description: "Claim numeric identifier.",
+            schema: { type: "integer", minimum: 1, example: 42 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Chronological list of status transitions",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: { $ref: "#/components/schemas/ClaimTimelineEntryDto" },
+                },
+                example: [
+                  {
+                    status: "pending",
+                    ledger: 1000,
+                    timestamp: "2026-01-01T00:00:00.000Z",
+                    actor: "GABC1111111111111111111111111111111111111111111111111111",
+                    reason: null,
+                  },
+                  {
+                    status: "approved",
+                    ledger: 1200,
+                    timestamp: "2026-01-02T00:00:00.000Z",
+                    actor: null,
+                    reason: "Vote majority reached",
+                  },
+                  {
+                    status: "paid",
+                    ledger: 1300,
+                    timestamp: "2026-01-03T00:00:00.000Z",
+                    actor: null,
+                    reason: "Payout processed",
+                  },
+                ],
+              },
+            },
+          },
+          "404": { $ref: "#/components/responses/NotFound" },
+        },
+      },
+    },
     "/claims": {
       get: {
         summary: "List claims",
@@ -552,6 +605,42 @@ export const openapiSpec = {
           title: { type: "string", minLength: 1, maxLength: 200 },
           body: { type: "string", minLength: 1, maxLength: 10000 },
           status: { type: "string", enum: ["draft", "published", "archived"] },
+        },
+      },
+      ClaimTimelineEntryDto: {
+        type: "object",
+        required: ["status", "ledger", "timestamp", "actor", "reason"],
+        properties: {
+          status: {
+            type: "string",
+            description: "Claim status at this point",
+            enum: ["pending", "approved", "paid", "rejected", "withdrawn"],
+            example: "pending",
+          },
+          ledger: {
+            type: "integer",
+            description: "Stellar ledger number",
+            minimum: 0,
+            example: 1000,
+          },
+          timestamp: {
+            type: "string",
+            format: "date-time",
+            description: "ISO-8601 UTC timestamp",
+            example: "2026-01-01T00:00:00.000Z",
+          },
+          actor: {
+            type: "string",
+            nullable: true,
+            description: "Actor wallet address who triggered the transition",
+            example: "GABC1111111111111111111111111111111111111111111111111111",
+          },
+          reason: {
+            type: "string",
+            nullable: true,
+            description: "Reason for the transition",
+            example: "Vote majority reached",
+          },
         },
       },
       ApiError: {

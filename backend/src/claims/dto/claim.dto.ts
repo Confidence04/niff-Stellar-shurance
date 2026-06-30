@@ -361,6 +361,32 @@ export class ClaimStatusHistoryEntryDto {
   timestamp!: string;
 }
 
+export class ClaimTimelineEntryDto {
+  @ApiProperty({ description: 'Claim status at this point' })
+  @Expose()
+  @IsString()
+  status!: string;
+
+  @ApiProperty({ description: 'Stellar ledger number' })
+  @Expose()
+  @IsInt()
+  @Min(0)
+  ledger!: number;
+
+  @ApiProperty({ description: 'ISO-8601 UTC timestamp' })
+  @Expose()
+  @IsString()
+  timestamp!: string;
+
+  @ApiProperty({ description: 'Actor wallet address who triggered the transition', nullable: true })
+  @Expose()
+  actor!: string | null;
+
+  @ApiProperty({ description: 'Reason for the transition', nullable: true })
+  @Expose()
+  reason!: string | null;
+}
+
 export class ClaimDetailResponseDto extends ClaimListItemDto {
   @ApiProperty({ description: 'Dispute window information for approved claims', type: DisputeInfoDto })
   @Expose()

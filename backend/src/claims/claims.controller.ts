@@ -28,12 +28,13 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { ClaimsService } from './claims.service';
-import { ClaimsListResponseDto, ClaimDetailResponseDto } from './dto/claim.dto';
+import { ClaimsListResponseDto, ClaimDetailResponseDto, ClaimTimelineEntryDto } from './dto/claim.dto';
 import { ClaimVoterDto } from './dto/claim-voter.dto';
 import { BuildClaimTransactionDto } from './dto/build-claim-transaction.dto';
 import { SubmitTransactionDto } from './dto/submit-transaction.dto';
 import { EvidenceUploadService } from './services/evidence-upload.service';
 import { EvidenceProxyService } from './services/evidence-proxy.service';
+import { ClaimHistoryService } from './services/claim-history.service';
 import { EVIDENCE_MAX_BYTES_DEFAULT } from './dto/evidence-upload.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WalletAddress } from '../auth/decorators/wallet-address.decorator';
@@ -52,6 +53,7 @@ export class ClaimsController {
     private readonly claimsService: ClaimsService,
     private readonly evidenceUploadService: EvidenceUploadService,
     private readonly evidenceProxyService: EvidenceProxyService,
+    private readonly claimHistoryService: ClaimHistoryService,
   ) {}
 
   @Post('evidence/upload')
@@ -156,6 +158,16 @@ export class ClaimsController {
     @WalletAddress() walletAddress?: string,
   ): Promise<ClaimDetailResponseDto> {
     return this.claimsService.getClaimById(id, walletAddress);
+  }
+
+  @Get(':id/timeline')
+  @ApiOperation({ summary: 'Get chronological status-transition timeline for a claim' })
+  @ApiResponse({ status: 200, description: 'Chronological status transitions', type: [ClaimTimelineEntryDto] })
+  @ApiResponse({ status: 404, description: 'Claim not found' })
+  async getClaimTimeline(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ClaimTimelineEntryDto[]> {
+    return this.claimHistoryService.getTimeline(id);
   }
 
   @Get(':id/voters')

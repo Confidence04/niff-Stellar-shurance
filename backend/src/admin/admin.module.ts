@@ -15,6 +15,7 @@ import { MaintenanceModule } from '../maintenance/maintenance.module';
 import { RateLimitModule } from '../rate-limit/rate-limit.module';
 import { QueueMonitorService } from '../queues/queue-monitor.service';
 import { BullBoardMiddleware } from './bull-board.middleware';
+import { AllowlistMiddleware } from './middleware/allowlist.middleware';
 import { MetricsModule } from '../metrics/metrics.module';
 import { CacheModule } from '../cache/cache.module';
 import { RpcModule } from '../rpc/rpc.module';
@@ -43,6 +44,11 @@ import { CommentRepository } from '../claims/comments/comment.repository';
 })
 export class AdminModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // IP allowlist runs before auth guards to fail closed for blocked IPs
+    consumer
+      .apply(AllowlistMiddleware)
+      .forRoutes({ path: 'admin*', method: RequestMethod.ALL });
+
     consumer
       .apply(BullBoardMiddleware)
       .forRoutes({ path: 'admin/queues*', method: RequestMethod.ALL });

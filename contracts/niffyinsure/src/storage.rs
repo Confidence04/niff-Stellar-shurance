@@ -239,6 +239,10 @@ pub enum DataKey {
     MaxSweepPerLedger,
     LastSweepLedger,
     CumulativeSweptThisLedger,
+    // ── Ledger close time estimate (Issue #842) ───────────────────────────────
+    /// Admin-configurable seconds-per-ledger estimate for UI deadline display.
+    /// Falls back to [`crate::ledger::SECS_PER_LEDGER`] (5) when unset.
+    SecsPerLedgerEstimate,
 }
 
 pub fn has_open_claim(env: &Env, holder: &Address, policy_id: u32) -> bool {
@@ -2081,3 +2085,32 @@ pub fn get_cumulative_swept_this_ledger(env: &Env) -> i128 {
         .unwrap_or(0)
 }
 
+
+// ── Ledger close time estimate (Issue #842) ───────────────────────────────────
+//
+// Returns the admin-configured seconds-per-ledger estimate used by the UI
+// to convert ledger sequence numbers to approximate wall-clock deadlines.
+//
+// NOTE: This is an **estimate only**. Actual Stellar ledger close times vary
+// between approximately 3–7 seconds depending on network conditions. This
+// value MUST NOT be used for on-chain enforcement — only for UX display.
+
+/// Set the admin-configurable seconds-per-ledger estimate.
+/// Caller must validate range before calling (recommend 1–30).
+pub fn set_secs_per_ledger_estimate(env: &Env, secs: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::SecsPerLedgerEstimate, &secs);
+}
+
+/// Get the configured seconds-per-ledger estimate.
+/// Returns [`crate::ledger::SECS_PER_LEDGER`] (5) when not explicitly set.
+///
+/// NOTE: This is an **estimate** — actual ledger close times vary. Do not
+/// use for legal deadlines or on-chain enforcement.
+pub fn get_secs_per_ledger_estimate(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::SecsPerLedgerEstimate)
+        .unwrap_or(crate::ledger::SECS_PER_LEDGER)
+}

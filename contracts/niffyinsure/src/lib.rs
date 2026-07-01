@@ -1436,7 +1436,36 @@ impl NiffyInsure {
         storage::get_governance_cooldown_ledgers(&env)
     }
 
-    /// Admin-only: set the maximum cumulative amount that can be swept in a single ledger.
+    // ── Issue #842: Ledger close time estimation ──────────────────────────────
+
+    /// Read-only: return the configured seconds-per-ledger estimate.
+    ///
+    /// Returns the admin-set value, or the compile-time default of 5 when unset.
+    ///
+    /// **NOTE:** This is an *estimate* — actual Stellar ledger close times vary
+    /// (typically 3–7 s). Use only for UI deadline display, never for on-chain
+    /// enforcement or legal SLAs.
+    pub fn get_ledger_close_time_estimate(env: Env) -> u32 {
+        storage::get_secs_per_ledger_estimate(&env)
+    }
+
+    /// Admin-only: update the seconds-per-ledger estimate if network conditions change.
+    ///
+    /// Valid range: 1–30 seconds. The default is 5 (Stellar Mainnet Protocol 20+).
+    pub fn admin_set_ledger_close_time_estimate(
+        env: Env,
+        secs: u32,
+    ) -> Result<(), validate::Error> {
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        if secs == 0 || secs > 30 {
+            return Err(validate::Error::InvalidLedgerWindow);
+        }
+        storage::set_secs_per_ledger_estimate(&env, secs);
+        Ok(())
+    }
+
+
     pub fn admin_set_max_sweep_per_ledger(env: Env, cap: i128) -> Result<(), AdminError> {
         admin::set_max_sweep_per_ledger(&env, cap)
     }

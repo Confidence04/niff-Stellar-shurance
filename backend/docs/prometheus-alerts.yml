@@ -160,3 +160,21 @@ groups:
           description: >
             Indexer has fallen {{ $value }} ledgers behind the network head.
             Check queue processing and indexer service health.
+
+      # ── Indexer last-processed-ledger age alert ────────────────────────────
+      # Fires when the indexer has not processed a new ledger in over 5 minutes.
+      # Threshold: 300 s (5 min). Stellar closes a ledger every ~5 s, so a
+      # 5-minute gap strongly indicates the indexer has stalled.
+      - alert: IndexerLastLedgerAgeHigh
+        expr: |
+          indexer_last_processed_ledger_age_seconds{app="niffyinsure-api"} > 300
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Indexer stalled on {{ $labels.network }} — last ledger processed {{ $value | humanizeDuration }} ago"
+          description: >
+            The indexer has not processed a new ledger for more than 5 minutes
+            on network {{ $labels.network }}. Check indexer logs and queue health.
+            Metric resets to near-zero once the indexer catches up.

@@ -190,6 +190,15 @@ export class IndexerService {
     const maxLedger = Math.max(...events.map((e: SorobanEvent) => e.ledger));
     const lag = latestLedger - maxLedger;
     this.metrics?.recordIndexerLag({ network, lag });
+
+    const lastEvent = events.reduce((a: SorobanEvent, b: SorobanEvent) =>
+      a.ledger >= b.ledger ? a : b,
+    );
+    this.metrics?.recordLastProcessedLedgerAge({
+      network,
+      ledgerClosedAt: new Date(lastEvent.ledgerClosedAt),
+    });
+
     return { processed: processedCount, lag };
   }
 

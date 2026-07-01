@@ -225,6 +225,16 @@ impl NiffyInsure {
         soroban_sdk::String::from_str(&env, env!("CARGO_PKG_VERSION"))
     }
 
+    /// Returns human-readable contract identity: name, version, and network hint.
+    /// All fields are compile-time constants. No storage reads, no auth required.
+    pub fn get_contract_metadata(env: Env) -> types::ContractMetadata {
+        types::ContractMetadata {
+            name: soroban_sdk::String::from_str(&env, env!("CARGO_PKG_NAME")),
+            version: soroban_sdk::String::from_str(&env, env!("CARGO_PKG_VERSION")),
+            network_passphrase_hint: soroban_sdk::String::from_str(&env, "Stellar Testnet"),
+        }
+    }
+
     /// Read-only: on-chain WASM hash for this deployed contract.
     /// The returned value is the canonical hash used by the deployment registry and RPC tooling.
     pub fn get_wasm_hash(env: Env) -> soroban_sdk::BytesN<32> {
@@ -349,6 +359,8 @@ impl NiffyInsure {
             55 => validate::Error::PayoutDeadlineNotReached,
             56 => validate::Error::InsufficientEvidence,
             57 => validate::Error::CooldownActive,
+            80 => validate::Error::DuplicateEvidence,
+            81 => validate::Error::PageSizeTooLarge,
             _ => validate::Error::ClaimNotApproved,
         };
         policy::map_quote_error(&env, err)
@@ -1184,6 +1196,42 @@ impl NiffyInsure {
     /// Read-only: number of active policies for a holder (= vote weight).
     pub fn get_active_policy_count(env: Env, holder: Address) -> u32 {
         storage::get_active_policy_count(&env, &holder)
+    }
+
+    /// Read-only (simulation-only): paginated list of inactive/expired policies for a holder.
+    ///
+    /// Returns policies where `is_active == false` or `current_ledger > end_ledger`.
+    /// `page` is zero-indexed; `page_size` is hard-capped at
+    /// [`types::INACTIVE_POLICIES_PAGE_SIZE_MAX`] — exceeding it reverts.
+    /// An empty result means no more inactive policies exist after the requested offset.
+    pub fn get_inactive_policies(
+        env: Env,
+        holder: Address,
+        page: u32,
+        page_size: u32,
+    ) -> Result<Vec<types::Policy>, validate::Error> {
+        if page_size > types::INACTIVE_POLICIES_PAGE_SIZE_MAX {
+            panic_with_error!(&env, validate::Error::PageSizeTooLarge);
+        }
+        let now = env.ledger().sequence();
+        let total = storage::get_policy_counter(&env, &holder);
+        let skip = page.saturating_mul(page_size);
+        let mut skipped: u32 = 0;
+        let mut results: Vec<types::Policy> = Vec::new(&env);
+        let mut id: u32 = 1;
+        while id <= total && results.len() < page_size {
+            if let Some(p) = storage::get_policy(&env, &holder, id) {
+                if !p.is_active || now > p.end_ledger {
+                    if skipped < skip {
+                        skipped = skipped.saturating_add(1);
+                    } else {
+                        results.push_back(p);
+                    }
+                }
+            }
+            id = id.saturating_add(1);
+        }
+        Ok(results)
     }
 
     /// Read-only: current replay-protection nonce for `holder`.

@@ -13,6 +13,15 @@ export interface ListPoliciesParams {
   includeDeleted?: boolean;
 }
 
+export interface SearchPoliciesParams {
+  holder?: string;
+  type?: string;
+  region?: string;
+  active?: boolean;
+  after?: string;
+  first?: number;
+}
+
 export interface PolicyConnection {
   items: Policy[];
   nextCursor: string | null;
@@ -121,6 +130,61 @@ export class PolicyReadService {
     });
 
     return new Map(policies.map((policy) => [policy.id, policy]));
+  }
+
+  async searchPolicies(params: SearchPoliciesParams): Promise<PolicyConnection> {
+    const first = clampFirst(params.first);
+    const tenantId = this.tenantCtx.tenantId;
+    const readClient = this.getReadClient();
+
+    const extra: Prisma.PolicyWhereInput = {};
+
+    if (params.holder) {
+      extra.holderAddress = { contains: params.holder, mode: 'insensitive' };
+    }
+
+    if (params.type) {
+      extra.policyType = params.type;
+    }
+
+    if (params.region) {
+      extra.region = params.region;
+    }
+
+    if (typeof params.active === 'boolean') {
+      extra.isActive = params.active;
+    }
+
+    if (params.after) {
+      const cursor = decodePolicyCursor(params.after);
+      extra.OR = [
+        { createdAt: { lt: new Date(cursor.createdAt) } },
+        {
+          createdAt: { equals: new Date(cursor.createdAt) },
+          id: { lt: cursor.id },
+        },
+      ];
+    }
+
+    const where = policyTenantWhere(tenantId, extra);
+
+    const [items, total] = await Promise.all([
+      readClient.policy.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: first,
+      }),
+      readClient.policy.count({ where }),
+    ]);
+
+    return {
+      items,
+      nextCursor:
+        items.length > 0 && items.length === first && total > first
+          ? encodePolicyCursor(items[items.length - 1])
+          : null,
+      total,
+    };
   }
 
   private buildListWhere(

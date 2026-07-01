@@ -40,7 +40,7 @@ fn set_governance_cooldown_succeeds_within_bounds() {
     let (_env, client, _admin) = setup();
     // 100 ledgers is well within the 30-day maximum.
     assert!(client
-        .try_admin_set_governance_cooldown_ledgers(&100u32)
+        .try_admin_set_gov_cooldown_ledgers(&100u32)
         .is_ok());
     assert_eq!(client.get_governance_cooldown_ledgers(), 100);
 }
@@ -51,7 +51,7 @@ fn set_governance_cooldown_out_of_bounds_fails() {
     // 30 days is niffyinsure::admin::MAX_GOVERNANCE_COOLDOWN_LEDGERS.
     // Exceed it: 30 * 17_280 + 1
     let too_large = 30u32 * 17_280u32 + 1;
-    let result = client.try_admin_set_governance_cooldown_ledgers(&too_large);
+    let result = client.try_admin_set_gov_cooldown_ledgers(&too_large);
     assert!(result.is_err());
 }
 
@@ -59,7 +59,7 @@ fn set_governance_cooldown_out_of_bounds_fails() {
 fn config_change_within_cooldown_reverts() {
     let (env, client, _admin) = setup();
     // Set a 1_000-ledger cooldown, then immediately try to change quorum.
-    client.admin_set_governance_cooldown_ledgers(&1_000u32);
+    client.admin_set_gov_cooldown_ledgers(&1_000u32);
 
     // Immediately try another change – must be blocked.
     let result = client.try_admin_set_quorum_bps(&500u32);
@@ -73,7 +73,7 @@ fn config_change_within_cooldown_reverts() {
 fn config_change_after_cooldown_succeeds() {
     let (env, client, _admin) = setup();
     let cooldown = 500u32;
-    client.admin_set_governance_cooldown_ledgers(&cooldown);
+    client.admin_set_gov_cooldown_ledgers(&cooldown);
 
     // Advance past the cooldown.
     env.ledger().with_mut(|l| {
@@ -88,7 +88,7 @@ fn config_change_after_cooldown_succeeds() {
 fn cooldown_enforced_on_vote_duration_change() {
     let (env, client, _admin) = setup();
     let cooldown = 200u32;
-    client.admin_set_governance_cooldown_ledgers(&cooldown);
+    client.admin_set_gov_cooldown_ledgers(&cooldown);
 
     // Within cooldown: should fail.
     assert!(
@@ -112,7 +112,7 @@ fn cooldown_enforced_on_vote_duration_change() {
 fn cooldown_enforced_on_rolling_claim_cap_change() {
     let (env, client, _admin) = setup();
     let cooldown = 300u32;
-    client.admin_set_governance_cooldown_ledgers(&cooldown);
+    client.admin_set_gov_cooldown_ledgers(&cooldown);
 
     // Within cooldown: should fail.
     assert!(client.try_set_rolling_claim_cap(&500_000i128).is_err());
@@ -128,7 +128,7 @@ fn cooldown_enforced_on_rolling_claim_cap_change() {
 fn cooldown_enforced_on_grace_period_change() {
     let (env, client, _admin) = setup();
     let cooldown = 400u32;
-    client.admin_set_governance_cooldown_ledgers(&cooldown);
+    client.admin_set_gov_cooldown_ledgers(&cooldown);
 
     // Within cooldown: should fail.
     let grace = types::MIN_GRACE_PERIOD_LEDGERS;
@@ -145,7 +145,7 @@ fn cooldown_enforced_on_grace_period_change() {
 fn cooldown_set_to_zero_disables_enforcement() {
     let (env, client, _admin) = setup();
     // First enable, then immediately disable.
-    client.admin_set_governance_cooldown_ledgers(&500u32);
+    client.admin_set_gov_cooldown_ledgers(&500u32);
 
     // Advance past cooldown to allow next change.
     env.ledger().with_mut(|l| {
@@ -153,7 +153,7 @@ fn cooldown_set_to_zero_disables_enforcement() {
     });
 
     // Disable cooldown.
-    client.admin_set_governance_cooldown_ledgers(&0u32);
+    client.admin_set_gov_cooldown_ledgers(&0u32);
 
     // Now rapid changes must succeed.
     assert!(client.try_admin_set_quorum_bps(&1_000u32).is_ok());

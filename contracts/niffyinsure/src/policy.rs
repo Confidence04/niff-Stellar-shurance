@@ -7,7 +7,7 @@ use crate::{
     validate::{self, Error},
 };
 pub use ledger::QUOTE_TTL_LEDGERS;
-use soroban_sdk::{contracterror, contractevent, contracttype, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, contracttype, Address, BytesN, Env, String};
 
 /// Current event schema version.
 pub const POLICY_EVENT_VERSION: u32 = 1;
@@ -66,6 +66,8 @@ pub enum PolicyError {
     InvalidDeductible = 123,
     /// Treasury balance is insufficient to cover projected claim obligations.
     InsufficientSolvency = 124,
+    /// Terms hash is all-zero (uninitialized). A non-zero SHA-256 digest is required at bind time.
+    InvalidTermsHash = 125,
 }
 
 #[contracttype]
@@ -92,6 +94,9 @@ pub struct PolicyInitiated {
     pub deductible: Option<i128>,
     pub start_ledger: u32,
     pub end_ledger: u32,
+    /// SHA-256 hash of the insurance terms document bound at policy initiation.
+    /// Non-zero; uniquely identifies the exact terms version in effect.
+    pub terms_hash: BytesN<32>,
 }
 
 /// Emitted when a protocol fee is collected from a premium payment.
@@ -388,6 +393,7 @@ pub fn initiate_policy(
     expected_nonce: Option<u64>,
     metadata_uri: String,
     region_code: Option<String>,
+    terms_hash: BytesN<32>,
 ) -> Result<Policy, PolicyError> {
     // Check granular pause: policy binding should be blocked if bind_paused
     storage::assert_bind_not_paused(env);
@@ -445,6 +451,10 @@ pub fn initiate_policy(
     }
     if base_amount <= 0 {
         return Err(PolicyError::InvalidCoverage);
+    }
+    // Terms hash must be non-zero: all-zero digest is rejected as uninitialized.
+    if terms_hash == BytesN::from_array(env, &[0u8; 32]) {
+        return Err(PolicyError::InvalidTermsHash);
     }
     if !check_solvency_ratio(env, &asset, base_amount) {
         return Err(PolicyError::InsufficientSolvency);
@@ -541,6 +551,7 @@ pub fn initiate_policy(
         terminated_by_admin: false,
         strike_count: 0,
         metadata_uri,
+        terms_hash: terms_hash.clone(),
     };
 
     validate::check_policy(&policy).map_err(|_| PolicyError::PolicyValidation)?;
@@ -570,6 +581,7 @@ pub fn initiate_policy(
         deductible: deductible_stored,
         start_ledger: current_ledger,
         end_ledger,
+        terms_hash,
     }
     .publish(env);
 

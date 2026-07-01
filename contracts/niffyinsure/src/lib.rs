@@ -720,6 +720,20 @@ impl NiffyInsure {
         claim::dispute_claim(&env, claim_id)
     }
 
+    /// Admin-only: reduce the voting deadline of a stalled `Processing` claim.
+    ///
+    /// Allows fast-tracking stalled claims when voter turnout is too low to reach quorum.
+    /// `new_deadline_ledger` must be in the future and earlier than the current deadline.
+    pub fn escalate_claim(
+        env: Env,
+        claim_id: u64,
+        new_deadline_ledger: u32,
+    ) -> Result<(), validate::Error> {
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        claim::escalate_claim(&env, claim_id, new_deadline_ledger)
+    }
+
     // ── Appeal mechanism (Issue #1) ───────────────────────────────────────────
 
     /// Claimant-only: open an appeal on a rejected claim within the appeal window.

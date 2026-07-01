@@ -129,6 +129,8 @@ export interface EnvironmentVariables {
   WEBHOOK_IP_ALLOWLIST_GITHUB: string;
   WEBHOOK_IP_ALLOWLIST_STRIPE: string;
   WEBHOOK_IP_ALLOWLIST_GENERIC: string;
+  /** Comma-separated CIDR allowlist for admin endpoints (#857). Empty = all IPs allowed. */
+  ADMIN_ALLOWED_CIDRS: string;
   /** Comma-separated URLs that receive outbound claim.filed webhook deliveries (#891). */
   CLAIM_FILED_WEBHOOK_URLS: string;
   /** Comma-separated URLs that receive outbound vote.cast webhook deliveries (#892). */
@@ -1326,6 +1328,17 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     section: 'Webhooks',
     description: 'Optional comma-separated IP allowlist for generic webhooks.',
     example: '',
+    required: 'optional',
+    schema: Joi.string().allow('').default(''),
+  },
+  ADMIN_ALLOWED_CIDRS: {
+    key: 'ADMIN_ALLOWED_CIDRS',
+    section: 'Admin',
+    description:
+      'Optional comma-separated CIDR allowlist for admin endpoints. ' +
+      'Supports IPv4 (e.g. "10.0.0.0/8,192.168.1.0/24") and IPv6. ' +
+      'Empty = all IPs allowed (backward compatible default).',
+    example: '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16',
     required: 'optional',
     schema: Joi.string().allow('').default(''),
   },

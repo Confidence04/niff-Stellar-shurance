@@ -243,6 +243,13 @@ pub enum DataKey {
     /// Admin-configurable seconds-per-ledger estimate for UI deadline display.
     /// Falls back to [`crate::ledger::SECS_PER_LEDGER`] (5) when unset.
     SecsPerLedgerEstimate,
+    // ── Admin role separation (Issue #1161) ───────────────────────────────────
+    /// Address authorized to call pause/unpause. Falls back to Admin when unset.
+    PauseAdmin,
+    /// Address authorized to call treasury operations (drain, sweep, rotation). Falls back to Admin.
+    TreasuryAdmin,
+    /// Address authorized to call governance parameter changes. Falls back to Admin.
+    ParamAdmin,
 }
 
 pub fn has_open_claim(env: &Env, holder: &Address, policy_id: u32) -> bool {
@@ -2113,4 +2120,40 @@ pub fn get_secs_per_ledger_estimate(env: &Env) -> u32 {
         .instance()
         .get(&DataKey::SecsPerLedgerEstimate)
         .unwrap_or(crate::ledger::SECS_PER_LEDGER)
+}
+
+// ── Admin role separation (Issue #1161) ───────────────────────────────────────
+//
+// Three scoped roles supplement the single admin key:
+//   - PauseAdmin   : may call pause / unpause only.
+//   - TreasuryAdmin: may call drain, sweep, and treasury-rotation operations.
+//   - ParamAdmin   : may call governance parameter changes (evidence count, cooldowns, …).
+//
+// When a role is unset, the main Admin address is accepted as a fallback so
+// that existing single-admin deployments continue to work without re-configuration.
+
+pub fn set_pause_admin(env: &Env, addr: &Address) {
+    env.storage().instance().set(&DataKey::PauseAdmin, addr);
+}
+
+pub fn get_pause_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::PauseAdmin)
+}
+
+pub fn set_treasury_admin(env: &Env, addr: &Address) {
+    env.storage()
+        .instance()
+        .set(&DataKey::TreasuryAdmin, addr);
+}
+
+pub fn get_treasury_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::TreasuryAdmin)
+}
+
+pub fn set_param_admin(env: &Env, addr: &Address) {
+    env.storage().instance().set(&DataKey::ParamAdmin, addr);
+}
+
+pub fn get_param_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::ParamAdmin)
 }

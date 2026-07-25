@@ -317,6 +317,65 @@ export class HorizonService {
     }
   }
 
+  private async fetchWithSingleFlightLock(
+    cacheKey: string,
+    fn: () => Promise<Record<string, unknown>>,
+  ): Promise<Record<string, unknown>> {
+    const client = this.redis.getClient();
+    const lockKey = `lock:${cacheKey}`;
+    const lockTtl = 30;
+
+    try {
+      const lockAcquired = (await client.set(lockKey, '1', 'EX', lockTtl, 'NX')) === 'OK';
+
+      if (lockAcquired) {
+        try {
+          const data = await fn();
+          await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
+          return data;
+        } finally {
+          await client.del(lockKey).catch(() => {
+            // Ignore lock release errors
+          });
+        }
+      } else {
+        const maxWaitMs = 5000;
+        const pollIntervalMs = 50;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitMs) {
+          const cached = await this.redis.get<Record<string, unknown>>(cacheKey);
+          if (cached) {
+            this.logger.debug(`Single-flight lock: obtained result from cache`);
+            return cached;
+          }
+
+          const lockExists = await client.exists(lockKey);
+          if (lockExists === 0) {
+            this.logger.debug(`Single-flight lock: holder released, checking cache`);
+            const retryData = await this.redis.get<Record<string, unknown>>(cacheKey);
+            if (retryData) {
+              return retryData;
+            }
+            const data = await fn();
+            await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
+            return data;
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
+        this.logger.warn(`Single-flight lock timeout for ${cacheKey}, computing anyway`);
+        const data = await fn();
+        await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
+        return data;
+      }
+    } catch (err) {
+      this.logger.warn(`Single-flight lock failed, degrading to unprotected: ${err}`);
+      return await fn();
+    }
+  }
+
   async getAccount(account: string): Promise<Record<string, unknown>> {
     if (!STELLAR_ADDRESS_RE.test(account)) {
       throw new BadRequestException("Invalid Stellar account address");
@@ -329,11 +388,10 @@ export class HorizonService {
       return cached;
     }
 
-    const url = `${this.horizonUrl}/accounts/${encodeURIComponent(account)}`;
-    const data = await this.fetchFromHorizonWithCircuitBreaker(url);
-
-    await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
-    return data;
+    return await this.fetchWithSingleFlightLock(cacheKey, () => {
+      const url = `${this.horizonUrl}/accounts/${encodeURIComponent(account)}`;
+      return this.fetchFromHorizonWithCircuitBreaker(url);
+    });
   }
 
   async getLedger(ledgerSequence: number): Promise<Record<string, unknown>> {
@@ -348,10 +406,9 @@ export class HorizonService {
       return cached;
     }
 
-    const url = `${this.horizonUrl}/ledgers/${ledgerSequence}`;
-    const data = await this.fetchFromHorizonWithCircuitBreaker(url);
-
-    await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
-    return data;
+    return await this.fetchWithSingleFlightLock(cacheKey, () => {
+      const url = `${this.horizonUrl}/ledgers/${ledgerSequence}`;
+      return this.fetchFromHorizonWithCircuitBreaker(url);
+    });
   }
 }

@@ -60,8 +60,17 @@ export class TxSubmitQueue {
       });
     }
 
+    let jobId: string | undefined;
+    if (data.idempotency_key) {
+      jobId = `idem:${data.idempotency_key}`;
+      const existingJob = await this.queue.getJob(jobId);
+      if (existingJob) {
+        return jobId;
+      }
+    }
+
     const job = await this.queue.add('submit', data, {
-      ...(data.idempotency_key && { jobId: `idem:${data.idempotency_key}` }),
+      ...(jobId && { jobId }),
     });
     return job.id!;
   }

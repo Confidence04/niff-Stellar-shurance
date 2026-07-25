@@ -96,6 +96,25 @@ describe('TxSubmitQueue', () => {
     expect(jobId).toBe('job-1');
     expect(mockQueue.add).toHaveBeenCalled();
   });
+
+  it('enqueue returns existing job ID if idempotency key already exists', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 10, active: 0, delayed: 0 });
+    const existingJob = { id: 'idem:uuid-123', returnvalue: { hash: 'abc' }, getState: jest.fn() };
+    mockQueue.getJob = jest.fn().mockResolvedValue(existingJob);
+
+    const jobId = await queue.enqueue({ signed_xdr: 'AAAA==', idempotency_key: 'uuid-123' });
+    expect(jobId).toBe('idem:uuid-123');
+    expect(mockQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('enqueue creates new job if idempotency key does not exist', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 10, active: 0, delayed: 0 });
+    mockQueue.getJob = jest.fn().mockResolvedValue(undefined);
+
+    const jobId = await queue.enqueue({ signed_xdr: 'AAAA==', idempotency_key: 'uuid-456' });
+    expect(jobId).toBe('job-1');
+    expect(mockQueue.add).toHaveBeenCalledWith('submit', { signed_xdr: 'AAAA==', idempotency_key: 'uuid-456' }, { jobId: 'idem:uuid-456' });
+  });
 });
 
 describe('TxSubmitWorker', () => {

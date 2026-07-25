@@ -1453,7 +1453,7 @@ impl NiffyInsure {
     /// Admin-only: update the seconds-per-ledger estimate if network conditions change.
     ///
     /// Valid range: 1–30 seconds. The default is 5 (Stellar Mainnet Protocol 20+).
-    pub fn admin_set_ledger_close_time_estimate(
+    pub fn admin_set_ledger_close_secs(
         env: Env,
         secs: u32,
     ) -> Result<(), validate::Error> {

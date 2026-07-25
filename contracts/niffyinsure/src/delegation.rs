@@ -20,12 +20,28 @@ pub struct DelegationGranted {
     pub permissions: DelegationPermissions,
 }
 
+/// Emitted when a still-valid delegation is explicitly revoked before expiry.
+///
+/// Topics are indexable by both the delegate (`operator`) and the original
+/// grantor (`grantor` / delegator). Payload includes the revoked permission
+/// scope so off-chain indexers can update delegation state without a storage
+/// round-trip.
+///
+/// Natural expiry (ledger advances past `expiry_ledger` with no revoke call)
+/// does **not** emit this event.
 #[contractevent(topics = ["niffyinsure", "delegation_revoked"])]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DelegationRevoked {
+    /// Delegate whose authority was revoked.
     #[topic]
     pub operator: Address,
+    /// Original grantor / delegator of the revoked authority.
+    #[topic]
+    pub grantor: Address,
+    /// Admin who performed the early revocation.
     pub revoked_by: Address,
+    /// Permission scope that was revoked.
+    pub permissions: DelegationPermissions,
     pub at_ledger: u32,
 }
 
@@ -62,13 +78,31 @@ pub fn grant_delegation(
 }
 
 /// Admin-only: revoke a delegation before it expires.
+///
+/// Emits [`DelegationRevoked`] only when a still-valid (non-expired) record is
+/// removed. No-ops with no event when the operator has no record, or when the
+/// stored record has already passed natural expiry (cleanup without a revoke
+/// signal).
 pub fn revoke_delegation(env: &Env, admin: &Address, operator: &Address) {
+    let Some(record) = storage::get_delegation(env, operator) else {
+        return;
+    };
+
+    let now = env.ledger().sequence();
     storage::remove_delegation(env, operator);
+
+    // Already past natural expiry — remove stale storage but do not emit the
+    // early-revocation event (indexers treat expiry as time-based, not revoke).
+    if now > record.expiry_ledger {
+        return;
+    }
 
     DelegationRevoked {
         operator: operator.clone(),
+        grantor: record.grantor,
         revoked_by: admin.clone(),
-        at_ledger: env.ledger().sequence(),
+        permissions: record.permissions,
+        at_ledger: now,
     }
     .publish(env);
 }

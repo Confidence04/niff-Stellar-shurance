@@ -79,6 +79,9 @@ jobs:
       - name: Test
         run: cargo test --workspace --features testutils
 
+      - name: Premium calculator standalone integration tests
+        run: cargo test -p premium_calculator --features testutils --test integration
+
       - name: Gas benchmarks
         run: cargo test --test gas_benchmarks --features testutils -- --nocapture
 

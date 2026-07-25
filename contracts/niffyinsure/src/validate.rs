@@ -133,6 +133,10 @@ pub enum Error {
     DuplicateEvidence = 80,
     /// Requested page_size exceeds the hard cap for this query.
     PageSizeTooLarge = 81,
+    /// Escalation deadline must be strictly after the current ledger.
+    EscalationDeadlineNotFuture = 82,
+    /// Escalation deadline must be earlier than the current voting deadline.
+    EscalationDeadlineNotEarlier = 83,
 }
 
 pub fn check_claim_evidence_update(

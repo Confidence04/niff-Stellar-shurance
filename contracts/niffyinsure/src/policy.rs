@@ -336,6 +336,8 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::CommitmentMismatch => "revealed vote does not match the prior commitment",
         Error::EscalationDeadlineNotFuture => "escalation deadline must be in the future",
         Error::EscalationDeadlineNotEarlier => "escalation deadline must be earlier than the current voting deadline",
+        Error::DuplicateEvidence => "claim evidence contains a duplicate entry",
+        Error::PageSizeTooLarge => "requested page size exceeds the allowed maximum",
     };
     QuoteFailure {
         code: err as u32,

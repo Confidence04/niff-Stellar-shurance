@@ -140,6 +140,8 @@ export interface EnvironmentVariables {
   PAGINATION_HMAC_SECRET: string;
   DISABLE_REINDEX_WORKER: string;
   RENEWAL_REMINDER_CRON: string;
+  /** Maximum pending jobs in tx-submit queue before rejecting with 429 backpressure. */
+  TX_SUBMIT_QUEUE_MAX_DEPTH: number;
   /** Per-queue BullMQ concurrency levels: format "queue-name=N,..." Defaults per queue if not specified. */
   QUEUE_CONCURRENCY_MAP: string;
   /**
@@ -1390,6 +1392,16 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: '0 * * * *',
     required: 'required',
     schema: Joi.string().default('0 * * * *'),
+  },
+  TX_SUBMIT_QUEUE_MAX_DEPTH: {
+    key: 'TX_SUBMIT_QUEUE_MAX_DEPTH',
+    section: 'Queues',
+    description:
+      'Maximum number of pending jobs in the tx-submit queue before new submissions are rejected with 429 backpressure. ' +
+      'Prevents unbounded queue growth and delays for all users.',
+    example: '1000',
+    required: 'optional',
+    schema: Joi.number().integer().min(1).default(1000),
   },
   QUEUE_CONCURRENCY_MAP: {
     key: 'QUEUE_CONCURRENCY_MAP',

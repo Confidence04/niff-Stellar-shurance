@@ -59,6 +59,10 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Check OpenAPI spec drift
+        run: npm run export-spec && git diff --exit-code openapi.json
+        continue-on-error: false
+
   env-parity:
     name: Env Parity
     runs-on: ubuntu-latest

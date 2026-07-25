@@ -15,11 +15,12 @@ import { VacuumService } from './vacuum.service';
 import { VacuumJob } from './vacuum.job';
 import { OutboundWebhookService } from '../webhooks/outbound-webhook.service';
 import { VoteReconciliationJob } from './vote-reconciliation.job';
-import { MetricsModule } from '../metrics/metrics.module';
+import { RampReconciliationService } from '../jobs/ramp-reconciliation.service';
+import { RampHealthCheckService } from '../jobs/ramp-health-check.service';
 
 @Module({
   imports: [ScheduleModule.forRoot(), PrismaModule, RpcModule, IpfsModule, MetricsModule],
-  providers: [AuditService, WasmDriftService, WasmDriftJob, PrivacyService, DataRetentionService, SolvencyMonitoringService, IpfsPinCheckJob, OutboundWebhookService, VoteReconciliationJob],
+  providers: [AuditService, WasmDriftService, WasmDriftJob, PrivacyService, DataRetentionService, SolvencyMonitoringService, IpfsPinCheckJob, OutboundWebhookService, VoteReconciliationJob, RampReconciliationService, RampHealthCheckService],
   exports: [PrivacyService, SolvencyMonitoringService],
 })
 export class MaintenanceModule {}

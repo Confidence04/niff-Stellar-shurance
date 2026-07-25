@@ -5,8 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/use-toast'
+import { ClaimsDetailSkeleton } from '@/features/claims/components/ClaimsSkeleton'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -349,13 +349,7 @@ export function ClaimVotePanel({ claimId }: ClaimVotePanelProps) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   if (loadingClaim) {
-    return (
-      <div className="space-y-4 p-4" aria-busy="true" aria-label="Loading claim">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
-    )
+    return <ClaimsDetailSkeleton />
   }
 
   if (claimError || !claim) {

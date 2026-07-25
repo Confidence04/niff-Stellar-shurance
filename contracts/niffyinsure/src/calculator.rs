@@ -1,12 +1,21 @@
 //! Cross-contract client for the external PremiumCalculator contract.
 //!
-//! When a calculator address is configured the policy contract delegates all
-//! premium computation to it.  If the calculator is paused or the call fails
-//! the error is propagated faithfully — bind fails closed.
+//! # Failure behaviour (fail-closed)
 //!
-//! When no calculator address is stored the contract falls back to the
-//! built-in `premium::compute_premium` logic so existing deployments keep
-//! working without migration.
+//! When a calculator address is configured the policy contract delegates all
+//! premium computation to it. If that cross-contract call fails — calculator
+//! contract error, pause, unreachable/misconfigured address, version mismatch,
+//! or host abort — the error is **propagated** to the caller as a typed
+//! [`Error`] (`CalculatorCallFailed`, `CalculatorPaused`, or
+//! `CalculatorVersionMismatch`). The transaction aborts; there is **no**
+//! silent fallback to the local engine while a calculator is configured.
+//!
+//! Local `premium::compute_premium` is used **only** when no calculator
+//! address is stored, so existing deployments without an external calculator
+//! keep working without migration.
+//!
+//! This fail-closed policy prevents silent price divergence between the
+//! configured calculator and a stale local table.
 
 use soroban_sdk::{contractclient, Address, Env};
 
@@ -125,9 +134,11 @@ pub fn set_calculator_with_version(env: &Env, calculator: &Address, expected_ver
 /// `asset` is used to look up an asset-specific multiplier table when no
 /// external calculator is configured. Pass `None` to use the global default.
 ///
-/// Routing logic:
-/// - If `CalcAddress` is set → cross-contract call; errors bubble up as
-///   `CalculatorCallFailed` (or `CalculatorPaused` for CalcError::Paused = 17).
+/// # Routing / failure semantics
+///
+/// - If `CalcAddress` is set → cross-contract call. Any failure (including
+///   pause, version mismatch, host abort, typed calc errors) is returned as a
+///   typed [`Error`]. **No local fallback** while a calculator is configured.
 /// - If `CalcAddress` is absent → local `premium::compute_premium` fallback,
 ///   using the asset-specific table when available.
 pub fn compute_quote(
@@ -139,11 +150,7 @@ pub fn compute_quote(
     asset: Option<&Address>,
 ) -> Result<PremiumQuote, Error> {
     match storage::get_calc_address(env) {
-        Some(calc_addr) => match call_external(env, &calc_addr, input, base_amount, quote_ttl) {
-            Ok(quote) => Ok(quote),
-            Err(Error::CalculatorPaused) => Err(Error::CalculatorPaused),
-            Err(_) => call_local(env, input, base_amount, include_breakdown, quote_ttl, asset),
-        },
+        Some(calc_addr) => call_external(env, &calc_addr, input, base_amount, quote_ttl),
         None => call_local(env, input, base_amount, include_breakdown, quote_ttl, asset),
     }
 }

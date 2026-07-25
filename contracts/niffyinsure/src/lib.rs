@@ -2,7 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod admin;
-mod calculator;
+pub mod calculator;
 mod claim;
 pub mod commit_reveal;
 pub mod delegation;

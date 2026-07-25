@@ -326,7 +326,7 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::InsufficientEvidence => "claim evidence count is below the minimum requirement",
         Error::CooldownActive => "policy claim cooldown window has not elapsed",
         Error::CalculatorVersionMismatch => {
-            "premium calculator config version is incompatible with this contract"
+            "premium calculator ABI version is incompatible with this contract"
         }
         Error::CommitRevealNotSet => "commit-reveal voting phases are not configured for this claim",
         Error::CommitPhaseEnded => "commit phase has ended for this claim",
@@ -335,7 +335,11 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::CommitmentNotFound => "no vote commitment found for this voter",
         Error::CommitmentMismatch => "revealed vote does not match the prior commitment",
         Error::EscalationDeadlineNotFuture => "escalation deadline must be in the future",
-        Error::EscalationDeadlineNotEarlier => "escalation deadline must be earlier than the current voting deadline",
+        Error::EscalationDeadlineNotEarlier => {
+            "escalation deadline must be earlier than the current voting deadline"
+        }
+        Error::DuplicateEvidence => "claim evidence contains a duplicate entry",
+        Error::PageSizeTooLarge => "requested page_size exceeds the hard cap",
     };
     QuoteFailure {
         code: err as u32,

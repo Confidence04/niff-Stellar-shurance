@@ -2,7 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 
 pub mod admin;
-mod calculator;
+pub mod calculator;
 mod claim;
 pub mod commit_reveal;
 pub mod delegation;
@@ -496,6 +496,50 @@ impl NiffyInsure {
         claim::vote_on_claim(&env, &voter, claim_id, &vote)
     }
 
+    /// Admin: configure commit/reveal ledger windows for a claim.
+    pub fn set_commit_reveal_phases(
+        env: Env,
+        claim_id: u64,
+        commit_phase_end_ledger: u32,
+        reveal_phase_end_ledger: u32,
+    ) -> Result<(), validate::Error> {
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        if reveal_phase_end_ledger <= commit_phase_end_ledger {
+            return Err(validate::Error::VotingDurationOutOfBounds);
+        }
+        commit_reveal::set_phases(
+            &env,
+            claim_id,
+            &commit_reveal::CommitRevealPhases {
+                commit_phase_end_ledger,
+                reveal_phase_end_ledger,
+            },
+        );
+        Ok(())
+    }
+
+    /// Commit phase: submit `SHA-256(vote_byte || salt)` without revealing the ballot.
+    pub fn commit_vote(
+        env: Env,
+        voter: Address,
+        claim_id: u64,
+        commitment: soroban_sdk::BytesN<32>,
+    ) -> Result<(), validate::Error> {
+        commit_reveal::commit_vote(&env, &voter, claim_id, commitment)
+    }
+
+    /// Reveal phase: open the prior commitment and count the ballot in the claim tally.
+    pub fn reveal_vote(
+        env: Env,
+        voter: Address,
+        claim_id: u64,
+        vote: types::VoteOption,
+        salt: soroban_sdk::BytesN<32>,
+    ) -> Result<(), validate::Error> {
+        commit_reveal::reveal_vote(&env, &voter, claim_id, vote, salt)
+    }
+
     /// Holder-authenticated delegation of vote weight to another address.
     ///
     /// Delegations are checked against the current ledger and expire at
@@ -872,6 +916,16 @@ impl NiffyInsure {
         admin::emit_admin_action(&env, &admin, "set_calculator");
     }
 
+    /// Admin: set calculator address and expected ABI version atomically.
+    /// Pass `expected_version = 0` to disable the ABI pin check.
+    pub fn set_calculator_with_version(env: Env, calculator_addr: Address, expected_version: u32) {
+        let admin = storage::get_admin(&env);
+        admin.require_auth();
+        admin::check_and_update_gov_cooldown(&env);
+        calculator::set_calculator_with_version(&env, &calculator_addr, expected_version);
+        admin::emit_admin_action(&env, &admin, "set_calculator_with_version");
+    }
+
     pub fn clear_calculator(env: Env) {
         let admin = storage::get_admin(&env);
         admin.require_auth();
@@ -879,11 +933,22 @@ impl NiffyInsure {
         env.storage()
             .instance()
             .remove(&storage::DataKey::CalcAddress);
+        calculator::clear_expected_calc_version(&env);
         admin::emit_admin_action(&env, &admin, "clear_calculator");
     }
 
     pub fn get_calculator(env: Env) -> Option<Address> {
         storage::get_calc_address(&env)
+    }
+
+    /// Expected calculator ABI version pin (`None` = check disabled).
+    pub fn get_expected_calc_version(env: Env) -> Option<u32> {
+        calculator::get_expected_calc_version(&env)
+    }
+
+    /// ABI version recorded on the last successful external calculator `compute`.
+    pub fn get_last_calc_abi_version(env: Env) -> Option<u32> {
+        calculator::get_last_calc_abi_version(&env)
     }
 
     // ── Region registry ───────────────────────────────────────────────────────
@@ -1453,7 +1518,7 @@ impl NiffyInsure {
     /// Admin-only: update the seconds-per-ledger estimate if network conditions change.
     ///
     /// Valid range: 1–30 seconds. The default is 5 (Stellar Mainnet Protocol 20+).
-    pub fn admin_set_ledger_close_time_estimate(
+    pub fn admin_set_ledger_close_est(
         env: Env,
         secs: u32,
     ) -> Result<(), validate::Error> {

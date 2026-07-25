@@ -115,7 +115,7 @@ pub enum Error {
     ProtocolFeeOutOfBounds = 71,
     /// Minimum solvency ratio basis points outside documented bounds.
     SolvencyRatioOutOfBounds = 72,
-    /// External premium calculator returned an incompatible config version.
+    /// External premium calculator ABI version does not match the expected pin.
     CalculatorVersionMismatch = 73,
     /// Commit-reveal voting phases are not configured for this claim.
     CommitRevealNotSet = 74,
@@ -133,6 +133,10 @@ pub enum Error {
     DuplicateEvidence = 80,
     /// Requested page_size exceeds the hard cap for this query.
     PageSizeTooLarge = 81,
+    /// Escalation deadline must be strictly after the current ledger.
+    EscalationDeadlineNotFuture = 82,
+    /// Escalation deadline must be earlier than the claim voting deadline.
+    EscalationDeadlineNotEarlier = 83,
 }
 
 pub fn check_claim_evidence_update(

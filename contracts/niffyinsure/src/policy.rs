@@ -334,6 +334,8 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::RevealPhaseEnded => "reveal phase has ended for this claim",
         Error::CommitmentNotFound => "no vote commitment found for this voter",
         Error::CommitmentMismatch => "revealed vote does not match the prior commitment",
+        Error::DuplicateEvidence => "evidence array contains a duplicate url/hash pair",
+        Error::PageSizeTooLarge => "requested page size exceeds the hard query cap",
         Error::EscalationDeadlineNotFuture => "escalation deadline must be in the future",
         Error::EscalationDeadlineNotEarlier => "escalation deadline must be earlier than the current voting deadline",
     };
@@ -869,6 +871,9 @@ pub fn renew_policy(
     validate::check_policy(&policy).map_err(|_| PolicyError::PolicyValidation)?;
 
     storage::set_policy(env, &holder, policy_id, &policy);
+
+    // Rolling claim cap resets for the renewed policy term (see rolling_claim_cap module docs).
+    crate::rolling_claim_cap::reset_on_renewal(env, &holder, policy_id, now);
 
     PolicyRenewed {
         version: POLICY_EVENT_VERSION,

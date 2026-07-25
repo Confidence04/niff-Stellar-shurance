@@ -1000,6 +1000,24 @@ pub struct DelegationRecord {
     pub permissions: DelegationPermissions,
 }
 
+/// Discrete permission scope exposed by `list_active_delegated_scopes` (Issue #1149).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DelegatedScopeKind {
+    SetFraudScore,
+    SetAssetConfig,
+    SetReinsurance,
+}
+
+/// One active delegated scope for an operator address.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActiveDelegatedScope {
+    pub scope: DelegatedScopeKind,
+    pub grantor: Address,
+    pub expiry_ledger: u32,
+}
+
 // ── Issue #581: Reinsurance pool events ──────────────────────────────────────
 
 /// Emitted when reinsurance funds are drawn to cover a claim shortfall.

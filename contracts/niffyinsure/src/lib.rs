@@ -1453,7 +1453,8 @@ impl NiffyInsure {
     /// Admin-only: update the seconds-per-ledger estimate if network conditions change.
     ///
     /// Valid range: 1–30 seconds. The default is 5 (Stellar Mainnet Protocol 20+).
-    pub fn admin_set_ledger_close_time_estimate(
+    /// Name shortened to satisfy Soroban's 32-char entrypoint limit.
+    pub fn admin_set_ledger_close_secs(
         env: Env,
         secs: u32,
     ) -> Result<(), validate::Error> {
@@ -1896,6 +1897,18 @@ impl NiffyInsure {
         delegation::get_delegation(&env, &operator)
     }
 
+    /// Read-only (simulation-safe): paginated list of active delegated scopes for
+    /// `operator`. Expired and revoked grants are omitted. `start_after` is the
+    /// number of scopes to skip; `limit` is clamped to `PAGE_SIZE_MAX`.
+    pub fn list_active_delegated_scopes(
+        env: Env,
+        operator: Address,
+        start_after: u32,
+        limit: u32,
+    ) -> soroban_sdk::Vec<types::ActiveDelegatedScope> {
+        delegation::list_active_delegated_scopes(&env, &operator, start_after, limit)
+    }
+
     // ── Issue #581: Reinsurance pool ──────────────────────────────────────────
 
     /// Admin: set the reinsurance contract address.
@@ -2168,16 +2181,18 @@ impl NiffyInsure {
         storage::remove_voter(&env, &holder);
     }
 
-    /// Test-only: advance a seeded policy's end_ledger to simulate a renewal
-    /// without going through token transfer. Mirrors what renew_policy does
-    /// to the policy record after premium collection.
+    /// Test-only: extend a seeded policy's end_ledger to simulate a renewal
+    /// without going through token transfer. Mirrors what `renew_policy` does
+    /// after premium collection (extend end, keep start) and resets the rolling cap.
     pub fn test_renew_policy(env: Env, holder: Address, policy_id: u32) {
         let mut policy = storage::get_policy(&env, &holder, policy_id).expect("policy not found");
-        let new_start = policy.end_ledger.saturating_add(1);
-        let new_end = new_start + ledger::POLICY_DURATION_LEDGERS;
-        policy.start_ledger = new_start;
+        let new_end = policy
+            .end_ledger
+            .saturating_add(ledger::POLICY_DURATION_LEDGERS);
         policy.end_ledger = new_end;
         storage::set_policy(&env, &holder, policy_id, &policy);
+        let now = env.ledger().sequence();
+        rolling_claim_cap::reset_on_renewal(&env, &holder, policy_id, now);
     }
 
     pub fn admin_set_open_claim_count(

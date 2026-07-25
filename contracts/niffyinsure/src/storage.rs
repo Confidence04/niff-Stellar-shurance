@@ -216,6 +216,8 @@ pub enum DataKey {
     AllowedAssetConfig(Address),
     // ── Issue #585: Admin role delegation ────────────────────────────────────
     Delegation(Address),
+    /// Ordered index of operators that currently have a stored delegation record.
+    DelegationOperatorIndex,
     // ── Issue #581: Reinsurance pool ─────────────────────────────────────────
     ReinsuranceContract,
     // ── Treasury depositor allowlist ─────────────────────────────────────────
@@ -1755,6 +1757,45 @@ pub fn remove_delegation(env: &Env, operator: &Address) {
     env.storage()
         .instance()
         .remove(&DataKey::Delegation(operator.clone()));
+}
+
+fn get_delegation_operator_index(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::DelegationOperatorIndex)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+fn set_delegation_operator_index(env: &Env, index: &Vec<Address>) {
+    env.storage()
+        .instance()
+        .set(&DataKey::DelegationOperatorIndex, index);
+}
+
+/// Insert `operator` into the delegation index if not already present.
+pub fn index_delegation_operator(env: &Env, operator: &Address) {
+    let mut index = get_delegation_operator_index(env);
+    for i in 0..index.len() {
+        if index.get(i).as_ref() == Some(operator) {
+            return;
+        }
+    }
+    index.push_back(operator.clone());
+    set_delegation_operator_index(env, &index);
+}
+
+/// Remove `operator` from the delegation index (no-op if absent).
+pub fn unindex_delegation_operator(env: &Env, operator: &Address) {
+    let index = get_delegation_operator_index(env);
+    let mut next: Vec<Address> = Vec::new(env);
+    for i in 0..index.len() {
+        if let Some(addr) = index.get(i) {
+            if &addr != operator {
+                next.push_back(addr);
+            }
+        }
+    }
+    set_delegation_operator_index(env, &next);
 }
 
 // ── Issue #581: Reinsurance pool ──────────────────────────────────────────────

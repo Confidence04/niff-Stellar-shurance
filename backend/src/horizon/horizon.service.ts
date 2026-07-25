@@ -15,6 +15,8 @@ import { PrismaService } from "../prisma/prisma.service";
 
 const CACHE_TTL_SECONDS = 15;
 const CACHE_PREFIX = "horizon:txcache:";
+const ACCOUNT_CACHE_PREFIX = "horizon:account:";
+const LEDGER_CACHE_PREFIX = "horizon:ledger:";
 const RL_KEY_PREFIX = "horizon:rl:";
 const RL_WINDOW_MS = 60_000;
 const RL_MAX_REQUESTS = 30;
@@ -276,5 +278,43 @@ export class HorizonService {
     } catch {
       return undefined;
     }
+  }
+
+  async getAccount(account: string): Promise<Record<string, unknown>> {
+    if (!STELLAR_ADDRESS_RE.test(account)) {
+      throw new BadRequestException("Invalid Stellar account address");
+    }
+
+    const cacheKey = `${ACCOUNT_CACHE_PREFIX}${account}`;
+    const cached = await this.redis.get<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Account cache hit for ${account}`);
+      return cached;
+    }
+
+    const url = `${this.horizonUrl}/accounts/${encodeURIComponent(account)}`;
+    const data = await this.fetchFromHorizonWithCircuitBreaker(url);
+
+    await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
+    return data;
+  }
+
+  async getLedger(ledgerSequence: number): Promise<Record<string, unknown>> {
+    if (!Number.isInteger(ledgerSequence) || ledgerSequence < 0) {
+      throw new BadRequestException("Ledger sequence must be a non-negative integer");
+    }
+
+    const cacheKey = `${LEDGER_CACHE_PREFIX}${ledgerSequence}`;
+    const cached = await this.redis.get<Record<string, unknown>>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Ledger cache hit for sequence ${ledgerSequence}`);
+      return cached;
+    }
+
+    const url = `${this.horizonUrl}/ledgers/${ledgerSequence}`;
+    const data = await this.fetchFromHorizonWithCircuitBreaker(url);
+
+    await this.redis.set(cacheKey, data, CACHE_TTL_SECONDS);
+    return data;
   }
 }

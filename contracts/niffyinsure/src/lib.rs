@@ -1453,10 +1453,7 @@ impl NiffyInsure {
     /// Admin-only: update the seconds-per-ledger estimate if network conditions change.
     ///
     /// Valid range: 1–30 seconds. The default is 5 (Stellar Mainnet Protocol 20+).
-    pub fn admin_set_ledger_close_time_estimate(
-        env: Env,
-        secs: u32,
-    ) -> Result<(), validate::Error> {
+    pub fn admin_set_ledger_close_estimate(env: Env, secs: u32) -> Result<(), validate::Error> {
         let admin = storage::get_admin(&env);
         admin.require_auth();
         if secs == 0 || secs > 30 {
@@ -1465,7 +1462,6 @@ impl NiffyInsure {
         storage::set_secs_per_ledger_estimate(&env, secs);
         Ok(())
     }
-
 
     pub fn admin_set_max_sweep_per_ledger(env: Env, cap: i128) -> Result<(), AdminError> {
         admin::set_max_sweep_per_ledger(&env, cap)
@@ -2102,6 +2098,7 @@ impl NiffyInsure {
         assert!(admin == stored, "only admin");
         storage::bump_instance(&env);
         governance_token::set_governance_token_runtime_enabled(&env, enabled);
+        governance_token::emit_governance_token_activation(&env, &admin, enabled);
         admin::emit_admin_action(&env, &admin, "gov_set_token_runtime_enabled");
     }
 

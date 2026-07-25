@@ -120,6 +120,15 @@ If the contract ABI changed, bump `_meta.contractSemver` in the JSON to match th
 | `cargo audit` fails | Run `cargo audit` and update or patch the flagged dependency |
 | WASM build fails | Run `make build` and resolve the compiler error |
 
+### Adding a new contract event variant
+
+When you add a new `#[contractevent]` struct to `events.rs`:
+
+1. Add the new event's `EventKey` to `backend/src/events/events.schema.ts` (`EventKey` union + `EVENT_PARSERS` entry + typed interface).
+2. Add a decode test in `backend/src/events/events.test.ts` that constructs the raw payload and asserts `parseEvent` returns the correct typed result.
+3. Update `docs/EVENT_DICTIONARY.md` with the new event's topic layout and payload schema.
+4. If any field is **removed or its type changes**, bump `SCHEMA_VERSION` in `events.schema.ts` and add a new versioned parser entry — backward-compatible additions do not require a bump.
+
 ---
 
 ## 4. Backend development (NestJS)

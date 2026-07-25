@@ -44,17 +44,13 @@ fn set_max_sweep_per_ledger_succeeds() {
 fn set_max_sweep_per_ledger_zero_fails() {
     let (_env, client, _admin, _token) = setup();
     // Zero is invalid (must be > 0).
-    assert!(client
-        .try_admin_set_max_sweep_per_ledger(&0i128)
-        .is_err());
+    assert!(client.try_admin_set_max_sweep_per_ledger(&0i128).is_err());
 }
 
 #[test]
 fn set_max_sweep_per_ledger_negative_fails() {
     let (_env, client, _admin, _token) = setup();
-    assert!(client
-        .try_admin_set_max_sweep_per_ledger(&-1i128)
-        .is_err());
+    assert!(client.try_admin_set_max_sweep_per_ledger(&-1i128).is_err());
 }
 
 #[test]

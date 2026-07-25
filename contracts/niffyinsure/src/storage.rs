@@ -2055,9 +2055,7 @@ pub fn set_max_sweep_per_ledger(env: &Env, cap: i128) {
 }
 
 pub fn get_max_sweep_per_ledger(env: &Env) -> Option<i128> {
-    env.storage()
-        .instance()
-        .get(&DataKey::MaxSweepPerLedger)
+    env.storage().instance().get(&DataKey::MaxSweepPerLedger)
 }
 
 pub fn set_last_sweep_ledger(env: &Env, ledger: u32) {
@@ -2067,9 +2065,7 @@ pub fn set_last_sweep_ledger(env: &Env, ledger: u32) {
 }
 
 pub fn get_last_sweep_ledger(env: &Env) -> Option<u32> {
-    env.storage()
-        .instance()
-        .get(&DataKey::LastSweepLedger)
+    env.storage().instance().get(&DataKey::LastSweepLedger)
 }
 
 pub fn set_cumulative_swept_this_ledger(env: &Env, amount: i128) {
@@ -2084,7 +2080,6 @@ pub fn get_cumulative_swept_this_ledger(env: &Env) -> i128 {
         .get(&DataKey::CumulativeSweptThisLedger)
         .unwrap_or(0)
 }
-
 
 // ── Ledger close time estimate (Issue #842) ───────────────────────────────────
 //

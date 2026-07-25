@@ -150,4 +150,3 @@ pub fn try_set_window_ledgers(env: &Env, new_window: u32) -> Result<(), AdminErr
     .publish(env);
     Ok(())
 }
-

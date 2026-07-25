@@ -6,7 +6,10 @@ import { RedisService } from '../cache/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('../config/network.config', () => ({
-  getNetworkConfig: () => ({ horizonUrl: 'https://horizon-testnet.stellar.org' }),
+  getNetworkConfig: () => ({
+    horizonUrl: 'https://horizon-testnet.stellar.org',
+    horizonFallbackUrl: 'https://horizon-fallback-testnet.stellar.org',
+  }),
 }));
 
 const VALID_ACCOUNT = 'GDZST3XVCDTUJ76ZAV2HA72KYEELTJE322P3HYHBNHY56PSFPSQYOPA';
@@ -172,6 +175,55 @@ describe('HorizonService - Account and Ledger Caching', () => {
       expect(result2).toEqual(cachedData2);
       expect(redisService.get).toHaveBeenNthCalledWith(1, 'horizon:ledger:100');
       expect(redisService.get).toHaveBeenNthCalledWith(2, 'horizon:ledger:101');
+    });
+  });
+
+  describe('fallback endpoint', () => {
+    it('should fall back to secondary endpoint on primary failure', async () => {
+      jest.spyOn(redisService, 'get').mockResolvedValue(null);
+      jest.spyOn(redisService, 'set').mockResolvedValue('OK');
+
+      const fallbackData = { sequence: 100 };
+      global.fetch = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Primary endpoint unreachable'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: jest.fn().mockResolvedValue(fallbackData),
+        });
+
+      const result = await service.getLedger(100);
+
+      expect(result).toEqual(fallbackData);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use primary endpoint when it succeeds', async () => {
+      jest.spyOn(redisService, 'get').mockResolvedValue(null);
+      jest.spyOn(redisService, 'set').mockResolvedValue('OK');
+
+      const primaryData = { sequence: 100 };
+      global.fetch = jest.fn().mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue(primaryData),
+      });
+
+      const result = await service.getLedger(100);
+
+      expect(result).toEqual(primaryData);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fail when both endpoints are unavailable', async () => {
+      jest.spyOn(redisService, 'get').mockResolvedValue(null);
+
+      global.fetch = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Primary down'))
+        .mockRejectedValueOnce(new Error('Fallback down'));
+
+      await expect(service.getLedger(100)).rejects.toThrow();
+      expect(global.fetch).toHaveBeenCalledTimes(2);
     });
   });
 });

@@ -35,6 +35,7 @@ const STELLAR_ADDRESS_RE = /^G[A-Z0-9]{55}$/;
 export class HorizonService {
   private readonly logger = new Logger(HorizonService.name);
   private readonly horizonUrl: string;
+  private readonly horizonFallbackUrl: string | undefined;
   private readonly maxRequests: number;
   private readonly windowMs: number;
   private readonly circuitBreakerThreshold: number;
@@ -48,6 +49,7 @@ export class HorizonService {
   ) {
     const networkConfig = getNetworkConfig();
     this.horizonUrl = networkConfig.horizonUrl;
+    this.horizonFallbackUrl = networkConfig.horizonFallbackUrl;
     this.maxRequests = this.config.get<number>("HORIZON_RATE_LIMIT_MAX", RL_MAX_REQUESTS);
     this.windowMs = this.config.get<number>("HORIZON_RATE_LIMIT_WINDOW_MS", RL_WINDOW_MS);
     this.circuitBreakerThreshold = this.config.get<number>(
@@ -240,7 +242,9 @@ export class HorizonService {
         throw error;
       }
 
-      return (await res.json()) as Record<string, unknown>;
+      const data = (await res.json()) as Record<string, unknown>;
+      this.logger.debug(`Horizon request succeeded from ${new URL(url).hostname}`);
+      return data;
     } catch (err) {
       const statusCode = (err as HttpStatusError).statusCode;
       if (statusCode === 429) {
@@ -248,6 +252,39 @@ export class HorizonService {
         error.statusCode = 429;
         throw error;
       }
+
+      const primaryHostname = new URL(url).hostname;
+      if (this.horizonFallbackUrl && !url.includes(new URL(this.horizonFallbackUrl).hostname)) {
+        this.logger.warn(
+          `Primary Horizon (${primaryHostname}) failed, attempting fallback: ${err}`,
+        );
+        try {
+          const fallbackUrl = url.replace(
+            new URL(this.horizonUrl).hostname,
+            new URL(this.horizonFallbackUrl).hostname,
+          );
+          const fallbackRes = await fetch(fallbackUrl, {
+            headers,
+            signal: AbortSignal.timeout(10_000),
+          });
+
+          if (!fallbackRes.ok) {
+            const fallbackError = new Error(
+              `Fallback Horizon returned HTTP ${fallbackRes.status}`,
+            ) as HttpStatusError;
+            fallbackError.statusCode = fallbackRes.status;
+            throw fallbackError;
+          }
+
+          const data = (await fallbackRes.json()) as Record<string, unknown>;
+          this.logger.info(`Horizon request succeeded from fallback endpoint`);
+          return data;
+        } catch (fallbackErr) {
+          this.logger.error(`Both primary and fallback Horizon endpoints failed: ${fallbackErr}`);
+          throw fallbackErr;
+        }
+      }
+
       throw err;
     }
   }

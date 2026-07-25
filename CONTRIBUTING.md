@@ -184,6 +184,12 @@ npm run error-catalog:check    # verify error codes are consistent
 | `openapi.json` stale | Run `make generate-client` and commit the updated file |
 | `npm audit` high/critical | Update or patch the flagged dependency |
 
+### Fixing CI: `address-normalization` job
+
+| Failure | Fix |
+|---|---|
+| Denormalized addresses detected | Run `cd backend && npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts` to normalize all addresses in the database, then verify the fix with `--dry-run` |
+
 ### Fixing CI: `migrations` job
 
 | Failure | Fix |
@@ -284,6 +290,7 @@ Every PR to `main` runs these jobs. All must pass (except `e2e-tests` which is a
 | `frontend` | lint, typecheck, build, unit tests, generated types | `cd frontend && npm run lint -- --max-warnings=0 && npm run typecheck && npm run build && npm test` |
 | `contract` | Rust tests, cargo audit, WASM build | `cargo test --workspace --features testutils && cargo audit && make build` |
 | `unit-tests` | Backend unit tests, `.env.example` drift, OpenAPI spec drift | `cd backend && npm test && npm run env:example:check && npm run export-spec` |
+| `address-normalization` | Tracked address data must be canonical (no denormalized M-addresses) | `cd backend && npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run` |
 | `golden-vectors` | Soroban ABI encoding (runs on contract/backend changes) | `cd backend && npm run refresh-vectors` |
 | `migrations` | Prisma migration history and schema validity | `cd backend && npx prisma migrate deploy` |
 | `accessibility` | axe/Playwright — no critical violations | `cd frontend && npx playwright test tests/accessibility.spec.ts` |
@@ -303,6 +310,7 @@ cargo test --workspace --features testutils
 cd backend
 npm run env:example:check
 npm run export-spec
+npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run
 npm test
 
 # Frontend

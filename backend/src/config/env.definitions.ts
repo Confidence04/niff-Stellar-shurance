@@ -135,6 +135,8 @@ export interface EnvironmentVariables {
   VOTE_CAST_WEBHOOK_URLS: string;
   /** Comma-separated URLs that receive treasury balance-low alert webhooks (#893). */
   TREASURY_ALERT_WEBHOOK_URLS: string;
+  /** Maximum outbound webhook payload size in bytes. Payloads exceeding this are rejected. Defaults to 1 MB. */
+  MAX_OUTBOUND_WEBHOOK_SIZE_BYTES: number;
   PAGINATION_HMAC_SECRET: string;
   DISABLE_REINDEX_WORKER: string;
   RENEWAL_REMINDER_CRON: string;
@@ -1350,6 +1352,14 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: 'https://example.com/hooks/treasury-alert',
     required: 'optional',
     schema: Joi.string().allow('').default(''),
+  },
+  MAX_OUTBOUND_WEBHOOK_SIZE_BYTES: {
+    key: 'MAX_OUTBOUND_WEBHOOK_SIZE_BYTES',
+    section: 'Webhooks',
+    description: 'Maximum payload size for outbound webhooks in bytes. Oversized payloads are rejected.',
+    example: '1048576',
+    required: 'optional',
+    schema: Joi.number().integer().min(1024).default(1048576),
   },
   PAGINATION_HMAC_SECRET: {
     key: 'PAGINATION_HMAC_SECRET',

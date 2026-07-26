@@ -22,6 +22,11 @@ export const MAX_OUTBOUND_ATTEMPTS = parseInt(
   10,
 );
 
+export const MAX_OUTBOUND_WEBHOOK_SIZE_BYTES = parseInt(
+  process.env.MAX_OUTBOUND_WEBHOOK_SIZE_BYTES ?? '1048576',
+  10,
+);
+
 export const outboundWebhookQueue = new Queue<OutboundWebhookJob>(QUEUE_NAME, {
   connection: getBullMQConnection(),
   defaultJobOptions: {
@@ -32,10 +37,25 @@ export const outboundWebhookQueue = new Queue<OutboundWebhookJob>(QUEUE_NAME, {
   },
 });
 
+function getPayloadSizeBytes(payload: Record<string, unknown>): number {
+  return Buffer.byteLength(JSON.stringify(payload), 'utf8');
+}
+
 export const outboundWebhookWorker = new Worker<OutboundWebhookJob>(
   QUEUE_NAME,
   async (job: Job<OutboundWebhookJob>) => {
     const { targetUrl, eventType, payload, idempotencyKey } = job.data;
+    const payloadSize = getPayloadSizeBytes(payload);
+
+    if (payloadSize > MAX_OUTBOUND_WEBHOOK_SIZE_BYTES) {
+      console.warn(
+        `[outbound-webhook] payload size exceeded: event=${eventType} to=${targetUrl} size=${payloadSize} max=${MAX_OUTBOUND_WEBHOOK_SIZE_BYTES} key=${idempotencyKey}`,
+      );
+      throw new Error(
+        `Webhook payload size (${payloadSize} bytes) exceeds limit (${MAX_OUTBOUND_WEBHOOK_SIZE_BYTES} bytes)`,
+      );
+    }
+
     const { default: axios } = await import('axios');
     await axios.post(targetUrl, payload, {
       headers: {

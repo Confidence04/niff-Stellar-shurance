@@ -540,3 +540,47 @@ describe('PurchaseWizard — Accessibility', () => {
     })
   })
 })
+
+describe('PurchaseWizard — Navigation Guard', () => {
+  it('registers beforeunload handler when wizard has entered data', async () => {
+    const addSpy = jest.spyOn(window, 'addEventListener')
+    renderWizard()
+    fireEvent.change(screen.getByLabelText(/policy type/i), { target: { value: 'Auto' } })
+    await waitFor(() => {
+      expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+    })
+    addSpy.mockRestore()
+  })
+
+  it('does not register beforeunload handler for empty wizard', () => {
+    const addSpy = jest.spyOn(window, 'addEventListener')
+    renderWizard()
+    const beforeUnloadCalls = addSpy.mock.calls.filter(([event]) => event === 'beforeunload')
+    expect(beforeUnloadCalls).toHaveLength(0)
+    addSpy.mockRestore()
+  })
+
+  it('removes beforeunload handler after successful completion', async () => {
+    const removeSpy = jest.spyOn(window, 'removeEventListener')
+    mockWalletState.address = 'GTEST1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGH'
+    mockWalletState.connectionStatus = 'connected'
+    mockGeneratePremium.mockResolvedValue(MOCK_QUOTE)
+    mockInitiatePolicy.mockResolvedValue({ transactionXdr: 'xdr123', quoteId: 'q1' })
+    mockWalletState.signTransaction.mockResolvedValue('signed-xdr')
+    mockSubmitSignedPolicy.mockResolvedValue({ policyId: 'pol-1', txHash: 'txhash123' })
+    mockTxStatus.status = 'SUCCESS'
+
+    renderWizard()
+    await fillStep1AndSubmit()
+    await waitFor(() => screen.getByRole('button', { name: /proceed to sign/i }))
+    fireEvent.click(screen.getByRole('button', { name: /proceed to sign/i }))
+    await waitFor(() => screen.getByRole('button', { name: /sign & submit/i }))
+    fireEvent.click(screen.getByRole('button', { name: /sign & submit/i }))
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/policies/pol-1')
+    })
+    expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function))
+    removeSpy.mockRestore()
+  })
+})

@@ -8,6 +8,7 @@ const mockJob = { id: 'job-1', returnvalue: null, failedReason: undefined, getSt
 const mockQueue = {
   add: jest.fn().mockResolvedValue(mockJob),
   getJob: jest.fn(),
+  getCountsPerState: jest.fn().mockResolvedValue({ waiting: 0, active: 0, delayed: 0 }),
 };
 jest.mock('bullmq', () => ({
   Queue: jest.fn().mockImplementation(() => mockQueue),
@@ -18,12 +19,22 @@ jest.mock('../../redis/client', () => ({ getBullMQConnection: jest.fn().mockRetu
 
 describe('TxSubmitQueue', () => {
   let queue: TxSubmitQueue;
+  let configService: ConfigService;
+  let metricsService: any;
 
   beforeEach(async () => {
+    metricsService = { recordQueueDepth: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TxSubmitQueue, { provide: ConfigService, useValue: { get: jest.fn() } }],
+      providers: [
+        TxSubmitQueue,
+        { provide: ConfigService, useValue: { get: jest.fn((key) => key === 'TX_SUBMIT_QUEUE_MAX_DEPTH' ? 100 : 'tx-submit') } },
+        { provide: 'MetricsService', useValue: metricsService },
+      ],
     }).compile();
     queue = module.get(TxSubmitQueue);
+    configService = module.get(ConfigService);
+    // Inject metrics service
+    (queue as any).metrics = metricsService;
   });
 
   afterEach(() => jest.clearAllMocks());
@@ -66,6 +77,43 @@ describe('TxSubmitQueue', () => {
     mockQueue.getJob.mockResolvedValue(undefined);
     const result = await queue.getStatus('nonexistent');
     expect(result.status).toBe('unknown');
+  });
+
+  it('enqueue records queue depth metric', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 5, active: 2, delayed: 1 });
+    await queue.enqueue({ signed_xdr: 'AAAA==' });
+    expect(metricsService.recordQueueDepth).toHaveBeenCalledWith({ queue: 'tx-submit', depth: 8 });
+  });
+
+  it('enqueue rejects when queue depth exceeds max', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 98, active: 3, delayed: 0 });
+    await expect(queue.enqueue({ signed_xdr: 'AAAA==' })).rejects.toThrow();
+  });
+
+  it('enqueue succeeds when queue depth is under limit', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 50, active: 0, delayed: 0 });
+    const jobId = await queue.enqueue({ signed_xdr: 'AAAA==' });
+    expect(jobId).toBe('job-1');
+    expect(mockQueue.add).toHaveBeenCalled();
+  });
+
+  it('enqueue returns existing job ID if idempotency key already exists', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 10, active: 0, delayed: 0 });
+    const existingJob = { id: 'idem:uuid-123', returnvalue: { hash: 'abc' }, getState: jest.fn() };
+    mockQueue.getJob = jest.fn().mockResolvedValue(existingJob);
+
+    const jobId = await queue.enqueue({ signed_xdr: 'AAAA==', idempotency_key: 'uuid-123' });
+    expect(jobId).toBe('idem:uuid-123');
+    expect(mockQueue.add).not.toHaveBeenCalled();
+  });
+
+  it('enqueue creates new job if idempotency key does not exist', async () => {
+    mockQueue.getCountsPerState = jest.fn().mockResolvedValue({ waiting: 10, active: 0, delayed: 0 });
+    mockQueue.getJob = jest.fn().mockResolvedValue(undefined);
+
+    const jobId = await queue.enqueue({ signed_xdr: 'AAAA==', idempotency_key: 'uuid-456' });
+    expect(jobId).toBe('job-1');
+    expect(mockQueue.add).toHaveBeenCalledWith('submit', { signed_xdr: 'AAAA==', idempotency_key: 'uuid-456' }, { jobId: 'idem:uuid-456' });
   });
 });
 

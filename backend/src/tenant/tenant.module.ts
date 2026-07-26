@@ -2,7 +2,7 @@ import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/c
 import { TenantContextService } from './tenant-context.service';
 import { TenantMiddleware } from './tenant.middleware';
 import { TenantConfigService } from './tenant-config.service';
-import { TenantConfigAuditService } from './tenant-config-audit.service';
+import { TenantOnboardingService } from './tenant-onboarding.service';
 import { TenantController } from './tenant.controller';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -30,10 +30,10 @@ import { PrismaModule } from '../prisma/prisma.module';
  * TenantContextService, TenantConfigService, and TenantConfigAuditService are exported for injection.
  */
 @Module({
-  imports: [FeatureFlagsModule, PrismaModule],
-  providers: [TenantContextService, TenantConfigService, TenantConfigAuditService],
+  imports: [FeatureFlagsModule],
+  providers: [TenantContextService, TenantConfigService, TenantOnboardingService],
   controllers: [TenantController],
-  exports: [TenantContextService, TenantConfigService, TenantConfigAuditService],
+  exports: [TenantContextService, TenantConfigService, TenantOnboardingService],
 })
 export class TenantModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

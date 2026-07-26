@@ -40,7 +40,7 @@ fn escalate_claim_valid() {
 
     client.escalate_claim(&claim_id, &new_deadline);
 
-    let claim = client.get_claim(&claim_id).unwrap();
+    let claim = client.get_claim(&claim_id);
     assert_eq!(claim.voting_deadline_ledger, new_deadline);
     assert_eq!(claim.status, ClaimStatus::Processing);
 }

@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { formatXlm } from '@/lib/formatTokenAmount'
 import { fetchClaimDetail, type ClaimDetailResponse } from '@/lib/api/claim-detail'
 import { useLatestLedger } from '@/hooks/use-latest-ledger'
+import { ClaimsDetailSkeleton } from '@/features/claims/components/ClaimsSkeleton'
 import { DeadlineCountdown } from './DeadlineCountdown'
 import { QuorumProgressBar } from './QuorumProgressBar'
 import { ClaimVotePanel } from './claim-vote-panel'
@@ -72,22 +72,7 @@ export function ClaimDetailView({ claimId }: ClaimDetailViewProps) {
   }, [claim])
 
   if (isLoading) {
-    return (
-      <section aria-label="Claim details" aria-busy="true" className="space-y-6">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <Card key={index}>
-            <CardContent>
-              <div className="space-y-4">
-                <Skeleton className="h-6 w-1/3" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-5/6" />
-                <Skeleton className="h-44 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-    )
+    return <ClaimsDetailSkeleton />
   }
 
   if (isError || !claim) {

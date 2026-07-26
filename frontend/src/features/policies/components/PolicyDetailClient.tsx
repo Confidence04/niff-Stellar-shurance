@@ -11,6 +11,7 @@ import { RenewModal } from './RenewModal'
 import { TerminateModal } from './TerminateModal'
 import { TransferPolicyModal } from './TransferPolicyModal'
 import { ClaimCooldownBanner } from './ClaimCooldownBanner'
+import { LastSyncedIndicator } from './LastSyncedIndicator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -152,12 +153,20 @@ export function PolicyDetailClient({ initialPolicy, policyId }: PolicyDetailClie
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [transferModalOpen, setTransferModalOpen] = useState(false)
 
-  const { data: policy = initialPolicy } = useQuery({
+  const {
+    data: policy = initialPolicy,
+    dataUpdatedAt,
+    isFetching,
+    refetch,
+  } = useQuery({
     queryKey: ['policy', policyId],
     queryFn: () => fetchPolicy(policyId),
     initialData: initialPolicy,
     refetchInterval: 15000,
   })
+
+  // Prefer React Query's last success time; fall back to load time for SSR initialData.
+  const lastSyncedAt = dataUpdatedAt > 0 ? dataUpdatedAt : Date.now()
 
   const ledgersRemaining = policy.expiry_countdown?.ledgers_remaining ?? 0
   const secondsRemaining = ledgersRemaining * LEDGER_CLOSE_SECONDS
@@ -199,7 +208,14 @@ export function PolicyDetailClient({ initialPolicy, policyId }: PolicyDetailClie
         </div>
       </div>
 
-      <h1 className="text-3xl font-bold">Policy #{policy.policy_id}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold">Policy #{policy.policy_id}</h1>
+        <LastSyncedIndicator
+          syncedAt={lastSyncedAt}
+          onRefresh={() => { void refetch() }}
+          isRefreshing={isFetching}
+        />
+      </div>
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Shield className="h-5 w-5" />Coverage Summary</CardTitle></CardHeader>

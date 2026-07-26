@@ -1,5 +1,12 @@
 # Issue #916 — Voter snapshot viewer: list eligible voters for a specific claim
 
+## Related issues
+- Backend/Frontend: this issue (#916)
+- Frontend: #917 — fraud score badge (related claim-detail surface work)
+
+_Applied retroactively as a demonstration of the
+[cross-stack issue linking convention](./cross-stack-linking-convention.md)._
+
 ## Summary
 Add a Voters panel on the claim detail page showing the eligible voter list from the on-chain registry with vote status (voted/not voted) for each address.
 

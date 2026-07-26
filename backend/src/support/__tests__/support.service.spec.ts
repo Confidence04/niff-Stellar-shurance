@@ -35,6 +35,9 @@ function makePrisma(ticket = mockTicket) {
       findMany: jest.fn().mockResolvedValue([ticket]),
       count: jest.fn().mockResolvedValue(1),
     },
+    supportTicketReply: {
+      create: jest.fn().mockResolvedValue({ id: 'reply-1', ticketId: 'uuid-1', message: 'Response', author: 'customer', createdAt: new Date() }),
+    },
     adminAuditLog: { create: jest.fn().mockResolvedValue({}) },
     faqStat: { upsert: jest.fn().mockResolvedValue({}) },
     faqItem: {
@@ -187,5 +190,33 @@ describe('SupportService — FAQ CRUD', () => {
     const svc = new SupportService(prisma, makeCaptcha(), makeConfig());
     await svc.reorderFaqItems({ items: [{ id: 'faq-1', displayOrder: 2 }] });
     expect(prisma.$transaction).toHaveBeenCalled();
+  });
+});
+
+describe('SupportService — Customer replies', () => {
+  it('addCustomerReply creates reply record', async () => {
+    const prisma = makePrisma();
+    const svc = new SupportService(prisma, makeCaptcha(), makeConfig());
+    await svc.addCustomerReply('uuid-1', 'Customer response');
+    expect(prisma.supportTicketReply.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ ticketId: 'uuid-1', message: 'Customer response', author: 'customer' }),
+      }),
+    );
+  });
+
+  it('addCustomerReply throws when ticket not found', async () => {
+    const prisma = makePrisma();
+    (prisma.supportTicket.findUnique as jest.Mock).mockResolvedValue(null);
+    const svc = new SupportService(prisma, makeCaptcha(), makeConfig());
+    await expect(svc.addCustomerReply('bad-id', 'Message')).rejects.toThrow(BadRequestException);
+  });
+
+  it('addCustomerReply triggers autoclose reopen logic', async () => {
+    const prisma = makePrisma();
+    const mockAutoclose = { reopenIfReply: jest.fn() };
+    const svc = new SupportService(prisma, makeCaptcha(), makeConfig(), mockAutoclose as any);
+    await svc.addCustomerReply('uuid-1', 'Customer response');
+    expect(mockAutoclose.reopenIfReply).toHaveBeenCalledWith('uuid-1');
   });
 });

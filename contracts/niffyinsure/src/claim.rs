@@ -1831,11 +1831,7 @@ pub struct ClaimEscalated {
 /// - `new_deadline_ledger` must be strictly in the future (`> now`).
 ///
 /// Auth: caller must be the contract admin (enforced at the lib.rs entrypoint).
-pub fn escalate_claim(
-    env: &Env,
-    claim_id: u64,
-    new_deadline_ledger: u32,
-) -> Result<(), Error> {
+pub fn escalate_claim(env: &Env, claim_id: u64, new_deadline_ledger: u32) -> Result<(), Error> {
     let mut claim = storage::get_claim(env, claim_id).ok_or(Error::ClaimNotFound)?;
 
     if claim.status != ClaimStatus::Processing {

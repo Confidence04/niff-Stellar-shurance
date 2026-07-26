@@ -61,6 +61,8 @@ export interface EnvironmentVariables {
   CACHE_TTL_SECONDS: number;
   QUOTE_SIMULATION_CACHE_ENABLED: 'true' | 'false' | '1' | '0';
   QUOTE_SIMULATION_CACHE_TTL_SECONDS: number;
+  ALLOWED_ASSETS_REFRESH_INTERVAL_MS: number;
+  ALLOWED_ASSETS_REFRESH_JITTER_MS: number;
   CAPTCHA_PROVIDER: CaptchaProvider;
   CAPTCHA_SECRET_KEY: string;
   CAPTCHA_SITE_KEY: string;
@@ -137,9 +139,19 @@ export interface EnvironmentVariables {
   VOTE_CAST_WEBHOOK_URLS: string;
   /** Comma-separated URLs that receive treasury balance-low alert webhooks (#893). */
   TREASURY_ALERT_WEBHOOK_URLS: string;
+  /** Maximum outbound webhook payload size in bytes. Payloads exceeding this are rejected. Defaults to 1 MB. */
+  MAX_OUTBOUND_WEBHOOK_SIZE_BYTES: number;
+  /** Webhook verification challenge timeout in milliseconds. Defaults to 5 minutes. */
+  WEBHOOK_VERIFICATION_TIMEOUT_MS: number;
+  /** Maximum attempts to send verification challenge before marking webhook inactive. Defaults to 3. */
+  WEBHOOK_MAX_VERIFICATION_ATTEMPTS: number;
+  /** API base URL for webhook verification links. */
+  API_BASE_URL: string;
   PAGINATION_HMAC_SECRET: string;
   DISABLE_REINDEX_WORKER: string;
   RENEWAL_REMINDER_CRON: string;
+  /** Maximum pending jobs in tx-submit queue before rejecting with 429 backpressure. */
+  TX_SUBMIT_QUEUE_MAX_DEPTH: number;
   /** Per-queue BullMQ concurrency levels: format "queue-name=N,..." Defaults per queue if not specified. */
   QUEUE_CONCURRENCY_MAP: string;
   /**
@@ -748,6 +760,22 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: '30',
     required: 'required',
     schema: Joi.number().integer().min(1).max(600).default(30),
+  },
+  ALLOWED_ASSETS_REFRESH_INTERVAL_MS: {
+    key: 'ALLOWED_ASSETS_REFRESH_INTERVAL_MS',
+    section: 'Caching',
+    description: 'Base refresh interval for allowed assets cache in milliseconds.',
+    example: '300000',
+    required: 'optional',
+    schema: Joi.number().integer().min(1000).default(300000),
+  },
+  ALLOWED_ASSETS_REFRESH_JITTER_MS: {
+    key: 'ALLOWED_ASSETS_REFRESH_JITTER_MS',
+    section: 'Caching',
+    description: 'Randomized jitter added to refresh interval to avoid thundering herd (in milliseconds).',
+    example: '60000',
+    required: 'optional',
+    schema: Joi.number().integer().min(0).default(60000),
   },
   CAPTCHA_PROVIDER: {
     key: 'CAPTCHA_PROVIDER',
@@ -1366,6 +1394,38 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     required: 'optional',
     schema: Joi.string().allow('').default(''),
   },
+  MAX_OUTBOUND_WEBHOOK_SIZE_BYTES: {
+    key: 'MAX_OUTBOUND_WEBHOOK_SIZE_BYTES',
+    section: 'Webhooks',
+    description: 'Maximum payload size for outbound webhooks in bytes. Oversized payloads are rejected.',
+    example: '1048576',
+    required: 'optional',
+    schema: Joi.number().integer().min(1024).default(1048576),
+  },
+  WEBHOOK_VERIFICATION_TIMEOUT_MS: {
+    key: 'WEBHOOK_VERIFICATION_TIMEOUT_MS',
+    section: 'Webhooks',
+    description: 'Timeout in milliseconds for webhook verification challenges. After this, the challenge expires.',
+    example: '300000',
+    required: 'optional',
+    schema: Joi.number().integer().min(10_000).default(300_000),
+  },
+  WEBHOOK_MAX_VERIFICATION_ATTEMPTS: {
+    key: 'WEBHOOK_MAX_VERIFICATION_ATTEMPTS',
+    section: 'Webhooks',
+    description: 'Maximum number of attempts to send verification challenge before marking webhook inactive.',
+    example: '3',
+    required: 'optional',
+    schema: Joi.number().integer().min(1).default(3),
+  },
+  API_BASE_URL: {
+    key: 'API_BASE_URL',
+    section: 'URLs',
+    description: 'Base URL of the API, used in webhook verification links and other features.',
+    example: 'https://api.example.com',
+    required: 'required',
+    schema: Joi.string().uri().required(),
+  },
   PAGINATION_HMAC_SECRET: {
     key: 'PAGINATION_HMAC_SECRET',
     section: 'Auth',
@@ -1390,6 +1450,16 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: '0 * * * *',
     required: 'required',
     schema: Joi.string().default('0 * * * *'),
+  },
+  TX_SUBMIT_QUEUE_MAX_DEPTH: {
+    key: 'TX_SUBMIT_QUEUE_MAX_DEPTH',
+    section: 'Queues',
+    description:
+      'Maximum number of pending jobs in the tx-submit queue before new submissions are rejected with 429 backpressure. ' +
+      'Prevents unbounded queue growth and delays for all users.',
+    example: '1000',
+    required: 'optional',
+    schema: Joi.number().integer().min(1).default(1000),
   },
   QUEUE_CONCURRENCY_MAP: {
     key: 'QUEUE_CONCURRENCY_MAP',

@@ -120,6 +120,15 @@ If the contract ABI changed, bump `_meta.contractSemver` in the JSON to match th
 | `cargo audit` fails | Run `cargo audit` and update or patch the flagged dependency |
 | WASM build fails | Run `make build` and resolve the compiler error |
 
+### Adding a new contract event variant
+
+When you add a new `#[contractevent]` struct to `events.rs`:
+
+1. Add the new event's `EventKey` to `backend/src/events/events.schema.ts` (`EventKey` union + `EVENT_PARSERS` entry + typed interface).
+2. Add a decode test in `backend/src/events/events.test.ts` that constructs the raw payload and asserts `parseEvent` returns the correct typed result.
+3. Update `docs/EVENT_DICTIONARY.md` with the new event's topic layout and payload schema.
+4. If any field is **removed or its type changes**, bump `SCHEMA_VERSION` in `events.schema.ts` and add a new versioned parser entry — backward-compatible additions do not require a bump.
+
 ---
 
 ## 4. Backend development (NestJS)
@@ -171,9 +180,21 @@ npm run test:e2e
 ```bash
 npm run env:example:generate   # regenerate .env.example from env.definitions.ts
 npm run env:example:check      # verify .env.example is not drifted
-npm run export-spec            # regenerate backend/openapi.json
+npm run export-spec            # regenerate backend/openapi.json from DTOs
 npm run error-catalog:check    # verify error codes are consistent
 ```
+
+### OpenAPI spec drift
+
+If you modify a backend DTO (request/response body), the OpenAPI spec must be regenerated:
+
+```bash
+cd backend
+npm run export-spec
+git add openapi.json
+```
+
+CI will fail if the spec drifts from the committed version. Always regenerate and commit the updated file when DTOs change.
 
 ### Fixing CI: `unit-tests` job
 
@@ -181,8 +202,14 @@ npm run error-catalog:check    # verify error codes are consistent
 |---|---|
 | `npm test` fails | Run `npm test` locally and fix the failing test |
 | `.env.example` drift | Run `npm run env:example:generate` and commit the updated file |
-| `openapi.json` stale | Run `make generate-client` and commit the updated file |
+| OpenAPI spec drift | Run `npm run export-spec` and commit the updated `backend/openapi.json` |
 | `npm audit` high/critical | Update or patch the flagged dependency |
+
+### Fixing CI: `address-normalization` job
+
+| Failure | Fix |
+|---|---|
+| Denormalized addresses detected | Run `cd backend && npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts` to normalize all addresses in the database, then verify the fix with `--dry-run` |
 
 ### Fixing CI: `migrations` job
 
@@ -284,6 +311,7 @@ Every PR to `main` runs these jobs. All must pass (except `e2e-tests` which is a
 | `frontend` | lint, typecheck, build, unit tests, generated types | `cd frontend && npm run lint -- --max-warnings=0 && npm run typecheck && npm run build && npm test` |
 | `contract` | Rust tests, cargo audit, WASM build | `cargo test --workspace --features testutils && cargo audit && make build` |
 | `unit-tests` | Backend unit tests, `.env.example` drift, OpenAPI spec drift | `cd backend && npm test && npm run env:example:check && npm run export-spec` |
+| `address-normalization` | Tracked address data must be canonical (no denormalized M-addresses) | `cd backend && npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run` |
 | `golden-vectors` | Soroban ABI encoding (runs on contract/backend changes) | `cd backend && npm run refresh-vectors` |
 | `migrations` | Prisma migration history and schema validity | `cd backend && npx prisma migrate deploy` |
 | `accessibility` | axe/Playwright — no critical violations | `cd frontend && npx playwright test tests/accessibility.spec.ts` |
@@ -303,6 +331,7 @@ cargo test --workspace --features testutils
 cd backend
 npm run env:example:check
 npm run export-spec
+npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run
 npm test
 
 # Frontend
@@ -379,6 +408,13 @@ Look for issues labelled **`good first issue`** on GitHub. These are scoped to b
 1. Comment on the issue to claim it — avoids duplicate work.
 2. Ask questions in the issue thread before writing code.
 3. Open a draft PR early so reviewers can give early feedback.
+
+### Cross-stack features
+
+If your issue is one part of a feature that spans contract, backend, and/or
+frontend, follow the
+[cross-stack issue linking convention](docs/issues/cross-stack-linking-convention.md)
+to keep the related issues discoverable.
 4. Reference the issue in your PR description: `Closes #<issue-number>`.
 
 ---

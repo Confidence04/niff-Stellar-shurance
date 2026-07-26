@@ -149,25 +149,39 @@ pub type CoverageType = CoverageTier;
 ///
 /// Terminal states (no further transitions): Paid, Rejected (after appeal window
 /// closes), AppealApproved (→ Paid only), AppealRejected, Withdrawn.
+///
+/// # Forward compatibility
+///
+/// Discriminant values are explicit and **stable**. The XDR encoding of a
+/// `ClaimStatus` value depends on its discriminant position; if variants were
+/// added or removed without explicit values the encoding of existing persisted
+/// data would shift, corrupting all stored claims.
+///
+/// Rules for adding new variants:
+/// 1. Always append at the **end** of this enum — never insert in the middle.
+/// 2. Assign the next sequential explicit discriminant (current max = 11).
+/// 3. Update `is_terminal()` if the new variant is terminal.
+/// 4. Add a decode test in the indexer (`events.schema.ts` / `events.test.ts`).
+/// 5. Do **not** renumber existing variants for any reason.
 #[contracttype]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ClaimStatus {
-    Processing,
-    Pending,
-    Approved,
-    PayoutTimeout,
-    Paid,
-    Rejected,
+    Processing = 0,
+    Pending = 1,
+    Approved = 2,
+    PayoutTimeout = 3,
+    Paid = 4,
+    Rejected = 5,
     /// Claimant has opened an appeal; fresh vote round in progress.
-    UnderAppeal,
+    UnderAppeal = 6,
     /// Appeal vote resolved in claimant's favour; awaits admin payout.
-    AppealApproved,
+    AppealApproved = 7,
     /// Appeal vote rejected; claim is permanently closed.
-    AppealRejected,
+    AppealRejected = 8,
     /// Claimant withdrew before voting began; record kept for audit; no payout.
-    Withdrawn,
+    Withdrawn = 9,
     /// Admin disputed the claim after approval; payout is frozen pending review.
-    Disputed,
+    Disputed = 10,
     /// RESERVED — appeal in progress; not yet implemented.
     ///
     /// This variant is declared to **reserve the discriminant** in the on-chain
@@ -202,7 +216,7 @@ pub enum ClaimStatus {
     /// still in flight.  `is_terminal()` returns `false` for this variant so
     /// that voting and finalization guards correctly reject further transitions
     /// until the appeal round resolves.
-    Appealed,
+    Appealed = 11,
 }
 
 impl ClaimStatus {
@@ -998,6 +1012,24 @@ pub struct DelegationRecord {
     pub expiry_ledger: u32,
     /// Permissions granted to the operator.
     pub permissions: DelegationPermissions,
+}
+
+/// Discrete permission scope exposed by `list_active_delegated_scopes` (Issue #1149).
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DelegatedScopeKind {
+    SetFraudScore,
+    SetAssetConfig,
+    SetReinsurance,
+}
+
+/// One active delegated scope for an operator address.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ActiveDelegatedScope {
+    pub scope: DelegatedScopeKind,
+    pub grantor: Address,
+    pub expiry_ledger: u32,
 }
 
 // ── Issue #581: Reinsurance pool events ──────────────────────────────────────

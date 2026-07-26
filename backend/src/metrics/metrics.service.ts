@@ -36,7 +36,10 @@ export class MetricsService implements OnModuleInit {
   readonly dlqDepth: client.Gauge<string>;
   readonly dlqJobFailed: client.Counter<string>;
   readonly queueActiveWorkers: client.Gauge<string>;
+  readonly queueDepth: client.Gauge<string>;
   readonly bullmqJobRetriesTotal: client.Counter<string>;
+  readonly queueDepth: client.Gauge<string>;
+  readonly jobProcessingDuration: client.Histogram<string>;
 
   // ── Indexer / observability metrics ───────────────────────────────────────
   readonly indexerLag: client.Gauge<string>;
@@ -158,10 +161,32 @@ export class MetricsService implements OnModuleInit {
       registers: [this.registry],
     });
 
+    this.queueDepth = new client.Gauge({
+      name: 'bullmq_queue_depth',
+      help: 'Total number of pending jobs in a queue (waiting + active + delayed)',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
     this.bullmqJobRetriesTotal = new client.Counter({
       name: 'bullmq_job_retries_total',
       help: 'Total job retry attempts per queue (excludes first attempt and final exhaustion)',
       labelNames: ['queue', 'job_name'],
+      registers: [this.registry],
+    });
+
+    this.queueDepth = new client.Gauge({
+      name: 'bullmq_queue_depth',
+      help: 'Number of jobs currently waiting to be processed in each queue',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.jobProcessingDuration = new client.Histogram({
+      name: 'bullmq_job_processing_duration_seconds',
+      help: 'Job processing duration in seconds per queue',
+      labelNames: ['queue', 'job_name', 'status'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 300],
       registers: [this.registry],
     });
 
@@ -443,6 +468,14 @@ export class MetricsService implements OnModuleInit {
 
   recordJobRetry(opts: { queue: string; jobName: string }) {
     this.bullmqJobRetriesTotal.inc({ queue: opts.queue, job_name: opts.jobName });
+  }
+
+  recordQueueActiveWorkers(opts: { queue: string; count: number }) {
+    this.queueActiveWorkers.set({ queue: opts.queue }, opts.count);
+  }
+
+  recordQueueDepth(opts: { queue: string; depth: number }) {
+    this.queueDepth.set({ queue: opts.queue }, opts.depth);
   }
 
   async getMetrics(): Promise<string> {

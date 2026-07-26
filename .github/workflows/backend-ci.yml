@@ -50,6 +50,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Check address normalization
+        run: npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run
+
       - name: Lint
         run: npm run lint
 
@@ -58,6 +61,10 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Check OpenAPI spec drift
+        run: npm run export-spec && git diff --exit-code openapi.json
+        continue-on-error: false
 
   env-parity:
     name: Env Parity

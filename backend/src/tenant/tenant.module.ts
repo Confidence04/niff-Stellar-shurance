@@ -2,6 +2,7 @@ import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/c
 import { TenantContextService } from './tenant-context.service';
 import { TenantMiddleware } from './tenant.middleware';
 import { TenantConfigService } from './tenant-config.service';
+import { TenantOnboardingService } from './tenant-onboarding.service';
 import { TenantController } from './tenant.controller';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
 
@@ -28,9 +29,9 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
  */
 @Module({
   imports: [FeatureFlagsModule],
-  providers: [TenantContextService, TenantConfigService],
+  providers: [TenantContextService, TenantConfigService, TenantOnboardingService],
   controllers: [TenantController],
-  exports: [TenantContextService, TenantConfigService],
+  exports: [TenantContextService, TenantConfigService, TenantOnboardingService],
 })
 export class TenantModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

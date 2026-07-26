@@ -115,7 +115,7 @@ pub enum Error {
     ProtocolFeeOutOfBounds = 71,
     /// Minimum solvency ratio basis points outside documented bounds.
     SolvencyRatioOutOfBounds = 72,
-    /// External premium calculator returned an incompatible config version.
+    /// External premium calculator ABI version does not match the expected pin.
     CalculatorVersionMismatch = 73,
     /// Commit-reveal voting phases are not configured for this claim.
     CommitRevealNotSet = 74,

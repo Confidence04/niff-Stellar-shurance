@@ -5,6 +5,7 @@ import { TenantConfigService } from './tenant-config.service';
 import { TenantOnboardingService } from './tenant-onboarding.service';
 import { TenantController } from './tenant.controller';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 /**
  * TenantModule
@@ -12,6 +13,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
  * Provides:
  *   - TenantContextService (REQUEST-scoped) — holds the resolved tenantId
  *   - TenantConfigService — returns per-tenant configuration (cached)
+ *   - TenantConfigAuditService — logs and retrieves tenant config change audit trail
  *   - TenantController — exposes GET /tenant/config endpoint
  *   - TenantMiddleware — resolves tenant from header / subdomain
  *
@@ -25,7 +27,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
  * feature flag changes to propagate to frontends.
  *
  * Import this module in AppModule. The middleware is applied globally.
- * TenantContextService and TenantConfigService are exported for injection.
+ * TenantContextService, TenantConfigService, and TenantConfigAuditService are exported for injection.
  */
 @Module({
   imports: [FeatureFlagsModule],

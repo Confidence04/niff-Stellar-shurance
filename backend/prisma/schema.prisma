@@ -210,6 +210,25 @@ model AdminAuditLog {
   @@map("admin_audit_logs")
 }
 
+/// Immutable audit trail for tenant configuration changes.
+/// Tracks who changed which tenant config key and when, including old/new values for forensics.
+/// Rows must never be updated or deleted — append-only.
+model TenantConfigAuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String   /// tenant identifier or 'default' for global config
+  actor     String   /// wallet address or email of the user who made the change
+  key       String   /// configuration key name (e.g. "solvency_buffer_threshold")
+  oldValue  String?  /// previous value (JSON-serialized, null if key was newly added)
+  newValue  String   /// new value (JSON-serialized)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([key])
+  @@index([actor])
+  @@map("tenant_config_audit_logs")
+}
+
 /// Runtime feature flags toggled by admin operators.
 model FeatureFlag {
   key         String   @id

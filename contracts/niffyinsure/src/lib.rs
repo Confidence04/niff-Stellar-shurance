@@ -31,7 +31,7 @@ use soroban_sdk::{
 
 #[contract]
 pub struct NiffyInsure;
-pub use admin::{AdminAction, AdminError, PendingAdminAction};
+pub use admin::{AdminAction, AdminError, PendingAdminAction, RoleError};
 pub use governance::{GovernanceError, Proposal};
 pub use policy::{PolicyError, RenewalError};
 pub use policy_lifecycle::PolicyError as LifecyclePolicyError;
@@ -1348,6 +1348,42 @@ impl NiffyInsure {
 
     pub fn cancel_admin(env: Env) {
         admin::cancel_admin(&env);
+    }
+
+    // ── Role management (Issue #1161) ─────────────────────────────────────────
+
+    /// Set the dedicated pause-admin address. Only the main admin can call this.
+    /// Pass the main admin address to "hold all roles" for single-admin deployments.
+    pub fn set_pause_admin(env: Env, addr: Address) {
+        let _admin = admin::require_admin(&env);
+        storage::set_pause_admin(&env, &addr);
+    }
+
+    /// Return the configured pause-admin, or None if it falls back to the main admin.
+    pub fn get_pause_admin(env: Env) -> Option<Address> {
+        storage::get_pause_admin(&env)
+    }
+
+    /// Set the dedicated treasury-admin address. Only the main admin can call this.
+    pub fn set_treasury_admin(env: Env, addr: Address) {
+        let _admin = admin::require_admin(&env);
+        storage::set_treasury_admin(&env, &addr);
+    }
+
+    /// Return the configured treasury-admin, or None if it falls back to the main admin.
+    pub fn get_treasury_admin(env: Env) -> Option<Address> {
+        storage::get_treasury_admin(&env)
+    }
+
+    /// Set the dedicated param-admin address. Only the main admin can call this.
+    pub fn set_param_admin(env: Env, addr: Address) {
+        let _admin = admin::require_admin(&env);
+        storage::set_param_admin(&env, &addr);
+    }
+
+    /// Return the configured param-admin, or None if it falls back to the main admin.
+    pub fn get_param_admin(env: Env) -> Option<Address> {
+        storage::get_param_admin(&env)
     }
 
     /// Propose a high-risk admin action for two-step confirmation.

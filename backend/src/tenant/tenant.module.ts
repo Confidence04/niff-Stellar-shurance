@@ -2,8 +2,10 @@ import { Module, MiddlewareConsumer, NestModule, RequestMethod } from '@nestjs/c
 import { TenantContextService } from './tenant-context.service';
 import { TenantMiddleware } from './tenant.middleware';
 import { TenantConfigService } from './tenant-config.service';
+import { TenantConfigAuditService } from './tenant-config-audit.service';
 import { TenantController } from './tenant.controller';
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
+import { PrismaModule } from '../prisma/prisma.module';
 
 /**
  * TenantModule
@@ -11,6 +13,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
  * Provides:
  *   - TenantContextService (REQUEST-scoped) — holds the resolved tenantId
  *   - TenantConfigService — returns per-tenant configuration (cached)
+ *   - TenantConfigAuditService — logs and retrieves tenant config change audit trail
  *   - TenantController — exposes GET /tenant/config endpoint
  *   - TenantMiddleware — resolves tenant from header / subdomain
  *
@@ -24,13 +27,13 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module';
  * feature flag changes to propagate to frontends.
  *
  * Import this module in AppModule. The middleware is applied globally.
- * TenantContextService and TenantConfigService are exported for injection.
+ * TenantContextService, TenantConfigService, and TenantConfigAuditService are exported for injection.
  */
 @Module({
-  imports: [FeatureFlagsModule],
-  providers: [TenantContextService, TenantConfigService],
+  imports: [FeatureFlagsModule, PrismaModule],
+  providers: [TenantContextService, TenantConfigService, TenantConfigAuditService],
   controllers: [TenantController],
-  exports: [TenantContextService, TenantConfigService],
+  exports: [TenantContextService, TenantConfigService, TenantConfigAuditService],
 })
 export class TenantModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

@@ -21,6 +21,7 @@ import { CacheModule } from '../cache/cache.module';
 import { RpcModule } from '../rpc/rpc.module';
 import { SupportModule } from '../support/support.module';
 import { CommentRepository } from '../claims/comments/comment.repository';
+import { TenantModule } from '../tenant/tenant.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CommentRepository } from '../claims/comments/comment.repository';
     CacheModule,
     RpcModule,
     SupportModule,
+    TenantModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -47,6 +47,8 @@ import { SorobanService } from '../rpc/soroban.service';
 import { TokenBlacklistService } from '../auth/token-blacklist.service';
 import { SupportService } from '../support/support.service';
 import { CommentRepository } from '../claims/comments/comment.repository';
+import { TenantConfigAuditService } from '../tenant/tenant-config-audit.service';
+import { TenantConfigAuditHistoryDto } from '../tenant/dto/tenant-config-audit.dto';
 
 class BatchRegisterVotersDto {
   @IsArray()
@@ -135,6 +137,7 @@ export class AdminController {
     private readonly tokenBlacklist: TokenBlacklistService,
     private readonly supportService: SupportService,
     private readonly commentRepository: CommentRepository,
+    private readonly tenantConfigAuditService: TenantConfigAuditService,
   ) {}
 
   // ── Governance: Voters ────────────────────────────────────────────
@@ -1118,5 +1121,40 @@ export class AdminController {
   ) {
     const actor = req.adminIdentity?.staffId || req.adminIdentity?.email || 'unknown';
     return this.supportService.assignTicket(ticketId, dto.assignee ?? null, actor, req.ip);
+  }
+
+  // ── Tenant Config Audit ────────────────────────────────────────────
+
+  /**
+   * GET /admin/tenants/:tenantId/config-audit
+   *
+   * Retrieve the configuration change audit history for a tenant.
+   * Returns entries in chronological order (oldest first).
+   * Supports optional filtering by config key and actor.
+   * Pagination via limit (default 50) and offset (default 0).
+   */
+  @Get('tenants/:tenantId/config-audit')
+  @MinAdminRole('viewer')
+  @ApiOperation({ summary: 'Retrieve tenant configuration change audit history' })
+  async getTenantConfigAuditHistory(
+    @Param('tenantId') tenantId: string,
+    @Query('key') key?: string,
+    @Query('actor') actor?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('offset', new ParseIntPipe({ optional: true })) offset?: number,
+  ): Promise<TenantConfigAuditHistoryDto> {
+    const { entries, total } = await this.tenantConfigAuditService.getAuditHistory({
+      tenantId,
+      key,
+      actor,
+      limit: limit || 50,
+      offset: offset || 0,
+    });
+
+    return {
+      entries,
+      total,
+      count: entries.length,
+    };
   }
 }

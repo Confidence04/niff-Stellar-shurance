@@ -50,6 +50,9 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Check address normalization
+        run: npx ts-node -r tsconfig-paths/register src/scripts/normalize-addresses.ts --dry-run
+
       - name: Lint
         run: npm run lint
 

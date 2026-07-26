@@ -26,5 +26,9 @@
   "get_fee_recipient": 5000,
   "get_min_solvency_ratio_bps": 5000,
   "get_multiplier_table": 5000,
-  "holder_active_policy_count": 5000
+  "holder_active_policy_count": 5000,
+  "_comment_cross_contract": "Baselines for cross-contract vs local premium-calculation paths (Issue #1160). Recorded on first benchmark run; update by running `cargo test --test gas_cross_contract --features testutils -- --nocapture`.",
+  "premium_calc.cross_contract": 500000,
+  "premium_pure.local": 50000,
+  "cross_contract_overhead": 450000
 }

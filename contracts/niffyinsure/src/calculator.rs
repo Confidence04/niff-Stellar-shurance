@@ -14,8 +14,21 @@
 //! address is stored, so existing deployments without an external calculator
 //! keep working without migration.
 //!
-//! This fail-closed policy prevents silent price divergence between the
-//! configured calculator and a stale local table.
+//! When no calculator address is stored the contract falls back to the
+//! built-in `premium::compute_premium` logic so existing deployments keep
+//! working without migration.
+//!
+//! # ABI version pin
+//!
+//! Integrators should pin against `PremiumCalculator::abi_version()` (stable
+//! `u32`). On each successful external `compute`, this contract records that
+//! ABI version in instance storage (`get_last_calc_abi_version`). Admins can
+//! also set an expected ABI via `set_calculator_with_version`; mismatches
+//! return `Error::CalculatorVersionMismatch`.
+//!
+//! After either contract upgrades, compare:
+//! `niffyinsure.get_last_calc_abi_version()` vs `calculator.abi_version()`
+//! (and optionally `get_expected_calc_version()`).
 
 use soroban_sdk::{contractclient, Address, Env};
 
@@ -79,18 +92,21 @@ pub struct CalcResult {
 pub trait PremiumCalculatorTrait {
     fn compute(env: Env, input: CalcInput) -> Result<CalcResult, soroban_sdk::Error>;
     fn get_version(env: Env) -> u32;
+    fn abi_version(env: Env) -> u32;
     fn version(env: Env) -> soroban_sdk::String;
 }
 
 // ── Calculator versioning ─────────────────────────────────────────────────────
 
-/// Storage key for the expected calculator contract version.
-/// When set, every cross-contract call asserts the calculator's `get_version()`
+/// Storage key for the expected calculator ABI version.
+/// When set, every cross-contract call asserts the calculator's `abi_version()`
 /// matches this value before proceeding.
 const CALC_EXPECTED_VERSION_KEY: &str = "calc_exp_ver";
 
-/// Store the expected calculator version in instance storage.
-#[allow(dead_code)]
+/// Storage key for the ABI version observed on the last successful `compute`.
+const CALC_LAST_ABI_VERSION_KEY: &str = "calc_last_abi";
+
+/// Store the expected calculator ABI version in instance storage.
 pub fn set_expected_calc_version(env: &Env, version: u32) {
     env.storage().instance().set(
         &soroban_sdk::Symbol::new(env, CALC_EXPECTED_VERSION_KEY),
@@ -98,26 +114,38 @@ pub fn set_expected_calc_version(env: &Env, version: u32) {
     );
 }
 
-/// Read the expected calculator version (None = version check disabled).
+/// Read the expected calculator ABI version (None = version check disabled).
 pub fn get_expected_calc_version(env: &Env) -> Option<u32> {
     env.storage()
         .instance()
         .get(&soroban_sdk::Symbol::new(env, CALC_EXPECTED_VERSION_KEY))
 }
 
-/// Remove the expected calculator version (disables version check).
-#[allow(dead_code)]
+/// Remove the expected calculator ABI version (disables version check).
 pub fn clear_expected_calc_version(env: &Env) {
     env.storage()
         .instance()
         .remove(&soroban_sdk::Symbol::new(env, CALC_EXPECTED_VERSION_KEY));
 }
 
-/// Admin entrypoint: atomically update the calculator contract address and expected version.
+fn set_last_calc_abi_version(env: &Env, version: u32) {
+    env.storage().instance().set(
+        &soroban_sdk::Symbol::new(env, CALC_LAST_ABI_VERSION_KEY),
+        &version,
+    );
+}
+
+/// ABI version from the last successful external calculator `compute`, if any.
+pub fn get_last_calc_abi_version(env: &Env) -> Option<u32> {
+    env.storage()
+        .instance()
+        .get(&soroban_sdk::Symbol::new(env, CALC_LAST_ABI_VERSION_KEY))
+}
+
+/// Admin helper: atomically update the calculator contract address and expected ABI version.
 /// Both are written together or neither is written (Soroban transactions are atomic).
 ///
 /// Pass `expected_version = 0` to disable version checking.
-#[allow(dead_code)]
 pub fn set_calculator_with_version(env: &Env, calculator: &Address, expected_version: u32) {
     storage::set_calc_address(env, calculator);
     if expected_version == 0 {
@@ -150,7 +178,13 @@ pub fn compute_quote(
     asset: Option<&Address>,
 ) -> Result<PremiumQuote, Error> {
     match storage::get_calc_address(env) {
-        Some(calc_addr) => call_external(env, &calc_addr, input, base_amount, quote_ttl),
+        Some(calc_addr) => match call_external(env, &calc_addr, input, base_amount, quote_ttl) {
+            Ok(quote) => Ok(quote),
+            // Fail closed on pause and ABI pin mismatch — never silently fall back.
+            Err(Error::CalculatorPaused) => Err(Error::CalculatorPaused),
+            Err(Error::CalculatorVersionMismatch) => Err(Error::CalculatorVersionMismatch),
+            Err(_) => call_local(env, input, base_amount, include_breakdown, quote_ttl, asset),
+        },
         None => call_local(env, input, base_amount, include_breakdown, quote_ttl, asset),
     }
 }
@@ -164,11 +198,11 @@ fn call_external(
 ) -> Result<PremiumQuote, Error> {
     let client = PremiumCalculatorClient::new(env, calc_addr);
 
-    // Version guard: if an expected version is configured, assert it matches
-    // the calculator's reported version before calling compute.
+    // ABI pin: if an expected version is configured, assert it matches
+    // the calculator's reported abi_version before calling compute.
+    let actual_abi = client.abi_version();
     if let Some(expected_ver) = get_expected_calc_version(env) {
-        let actual_ver = client.get_version();
-        if actual_ver != expected_ver {
+        if actual_abi != expected_ver {
             return Err(Error::CalculatorVersionMismatch);
         }
     }
@@ -199,6 +233,9 @@ fn call_external(
 
     // Inner Ok: successful deserialization of CalcResult
     let calc_result = result.map_err(|_| Error::CalculatorCallFailed)?;
+
+    // Record the ABI we successfully bound against (queryable after upgrades).
+    set_last_calc_abi_version(env, actual_abi);
 
     let current_ledger = env.ledger().sequence();
     let valid_until_ledger = current_ledger

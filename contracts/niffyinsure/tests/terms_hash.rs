@@ -28,7 +28,8 @@ const STARTING_BALANCE: i128 = 100_000_000_000;
 fn setup() -> (Env, NiffyInsureClient<'static>, Address, Address) {
     let env = Env::default();
     env.mock_all_auths();
-    env.ledger().with_mut(|l| l.sequence_number = INITIAL_LEDGER);
+    env.ledger()
+        .with_mut(|l| l.sequence_number = INITIAL_LEDGER);
     let contract_id = env.register(niffyinsure::NiffyInsure, ());
     let client = NiffyInsureClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
@@ -151,7 +152,10 @@ fn terms_hash_is_stored_and_readable_via_get_policy() {
     let (holder, policy) = bind_policy_with_hash(&env, &client, &token, hash.clone());
 
     // Verify from the returned Policy struct
-    assert_eq!(policy.terms_hash, hash, "returned policy.terms_hash mismatch");
+    assert_eq!(
+        policy.terms_hash, hash,
+        "returned policy.terms_hash mismatch"
+    );
 
     // Verify from get_policy storage round-trip
     let stored = client
@@ -173,7 +177,9 @@ fn terms_hash_is_independent_per_policy() {
 
     let hash1 = common::sample_digest(&env);
     let mut raw2 = [0u8; 32];
-    raw2.iter_mut().enumerate().for_each(|(i, b)| *b = (31 - i) as u8 + 1);
+    raw2.iter_mut()
+        .enumerate()
+        .for_each(|(i, b)| *b = (31 - i) as u8 + 1);
     let hash2 = BytesN::from_array(&env, &raw2);
 
     let holder = Address::generate(&env);
@@ -211,7 +217,10 @@ fn terms_hash_is_independent_per_policy() {
         },
     );
 
-    assert_ne!(p1.policy_id, p2.policy_id, "each policy must have a unique ID");
+    assert_ne!(
+        p1.policy_id, p2.policy_id,
+        "each policy must have a unique ID"
+    );
     assert_eq!(p1.terms_hash, hash1, "first policy must store hash1");
     assert_eq!(p2.terms_hash, hash2, "second policy must store hash2");
 
@@ -247,7 +256,10 @@ fn terms_hash_present_in_policy_initiated_event() {
 
     // Verify the policy is persisted (meaning the successful path executed)
     let stored = client.get_policy(&holder, &policy.policy_id).unwrap();
-    assert_eq!(stored.terms_hash, hash, "stored terms_hash must match event payload");
+    assert_eq!(
+        stored.terms_hash, hash,
+        "stored terms_hash must match event payload"
+    );
 }
 
 // ── Non-zero sentinel variations ──────────────────────────────────────────────
@@ -272,15 +284,17 @@ fn full_32_byte_hash_is_stored_correctly() {
 
     // Simulate a realistic SHA-256 digest (all bytes non-zero)
     let raw: [u8; 32] = [
-        0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65,
-        0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0, 0x15,
-        0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0x0b, 0x82, 0x2c,
-        0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0, 0x0a, 0x08,
+        0x9f, 0x86, 0xd0, 0x81, 0x88, 0x4c, 0x7d, 0x65, 0x9a, 0x2f, 0xea, 0xa0, 0xc5, 0x5a, 0xd0,
+        0x15, 0xa3, 0xbf, 0x4f, 0x1b, 0x2b, 0x0b, 0x82, 0x2c, 0xd1, 0x5d, 0x6c, 0x15, 0xb0, 0xf0,
+        0x0a, 0x08,
     ];
     let hash = BytesN::from_array(&env, &raw);
 
     let (holder, policy) = bind_policy_with_hash(&env, &client, &token, hash.clone());
     let stored = client.get_policy(&holder, &policy.policy_id).unwrap();
 
-    assert_eq!(stored.terms_hash, hash, "full SHA-256 digest must survive storage round-trip");
+    assert_eq!(
+        stored.terms_hash, hash,
+        "full SHA-256 digest must survive storage round-trip"
+    );
 }

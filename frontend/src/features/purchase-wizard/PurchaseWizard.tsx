@@ -1,11 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Stepper, type Step } from '@/components/ui/stepper'
 import { useDraftPersistence } from '@/hooks/use-draft-persistence'
 import { CoverageDetailsStep } from './CoverageDetailsStep'
+import { parseDeepLinkCoverage } from './deep-link'
 import { QuoteReviewStep } from './QuoteReviewStep'
 import { WalletSignStep } from './WalletSignStep'
 import type { WizardDraft, WizardStep } from './types'
@@ -28,6 +30,7 @@ export function PurchaseWizard() {
     WIZARD_DRAFT_KEY,
     WIZARD_SCHEMA_VERSION,
   )
+  const searchParams = useSearchParams()
 
   // Restore draft on mount
   const [step, setStep] = useState<WizardStep>(0)
@@ -39,6 +42,16 @@ export function PurchaseWizard() {
   useEffect(() => {
     if (restoredRef.current) return
     restoredRef.current = true
+
+    // A shared quote link takes priority over any saved draft. Only the
+    // coverage inputs are trusted from the URL — the quote itself is always
+    // regenerated through the normal flow, never bypassed.
+    const deepLinkCoverage = parseDeepLinkCoverage(searchParams)
+    if (deepLinkCoverage) {
+      setCoverageData(deepLinkCoverage)
+      return
+    }
+
     if (hasDraft) {
       const draft = loadDraft()
       if (draft) {
@@ -48,7 +61,7 @@ export function PurchaseWizard() {
         setQuoteExpiresAt(draft.quoteExpiresAt)
       }
     }
-  }, [hasDraft, loadDraft])
+  }, [hasDraft, loadDraft, searchParams])
 
   const persistDraft = useCallback(
     (patch: Partial<WizardDraft>) => {

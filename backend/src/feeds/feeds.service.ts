@@ -17,11 +17,26 @@ type FinalizedClaim = {
 export class FeedsService {
   private readonly baseUrl: string;
 
+  /** In-memory cache for the claims Atom feed, warmed at boot via warmClaimsAtomFeedCache(). */
+  private claimsAtomFeedCache: string | null = null;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
     this.baseUrl = this.config.get<string>('APP_BASE_URL', 'https://app.niffyinsure.com');
+  }
+
+  /** Builds and caches the feed so the first HTTP request doesn't pay generation cost. */
+  async warmClaimsAtomFeedCache(): Promise<void> {
+    this.claimsAtomFeedCache = await this.buildClaimsAtomFeed();
+  }
+
+  async getCachedClaimsAtomFeed(): Promise<string> {
+    if (this.claimsAtomFeedCache === null) {
+      await this.warmClaimsAtomFeedCache();
+    }
+    return this.claimsAtomFeedCache as string;
   }
 
   async buildClaimsAtomFeed(): Promise<string> {

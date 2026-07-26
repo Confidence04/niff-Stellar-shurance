@@ -1,5 +1,12 @@
 # Issue #917 — Claim fraud score badge: display risk score on claim detail when set
 
+## Related issues
+- Frontend: this issue (#917)
+- Backend: #916 — voter snapshot viewer (related claim-detail surface work)
+
+_Applied retroactively as a demonstration of the
+[cross-stack issue linking convention](./cross-stack-linking-convention.md)._
+
 ## Summary
 Display a colour-coded fraud risk score badge (low / medium / high) on the claim detail page when a `fraud_score` has been set by the on-chain oracle, with a tooltip explaining its source.
 

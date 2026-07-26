@@ -326,7 +326,7 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::InsufficientEvidence => "claim evidence count is below the minimum requirement",
         Error::CooldownActive => "policy claim cooldown window has not elapsed",
         Error::CalculatorVersionMismatch => {
-            "premium calculator config version is incompatible with this contract"
+            "premium calculator ABI version is incompatible with this contract"
         }
         Error::CommitRevealNotSet => "commit-reveal voting phases are not configured for this claim",
         Error::CommitPhaseEnded => "commit phase has ended for this claim",
@@ -334,10 +334,14 @@ pub fn map_quote_error(env: &Env, err: Error) -> QuoteFailure {
         Error::RevealPhaseEnded => "reveal phase has ended for this claim",
         Error::CommitmentNotFound => "no vote commitment found for this voter",
         Error::CommitmentMismatch => "revealed vote does not match the prior commitment",
+        Error::DuplicateEvidence => "evidence array contains a duplicate url/hash pair",
+        Error::PageSizeTooLarge => "requested page size exceeds the hard query cap",
         Error::EscalationDeadlineNotFuture => "escalation deadline must be in the future",
-        Error::EscalationDeadlineNotEarlier => "escalation deadline must be earlier than the current voting deadline",
+        Error::EscalationDeadlineNotEarlier => {
+            "escalation deadline must be earlier than the current voting deadline"
+        }
         Error::DuplicateEvidence => "claim evidence contains a duplicate entry",
-        Error::PageSizeTooLarge => "requested page size exceeds the allowed maximum",
+        Error::PageSizeTooLarge => "requested page_size exceeds the hard cap",
     };
     QuoteFailure {
         code: err as u32,
@@ -871,6 +875,9 @@ pub fn renew_policy(
     validate::check_policy(&policy).map_err(|_| PolicyError::PolicyValidation)?;
 
     storage::set_policy(env, &holder, policy_id, &policy);
+
+    // Rolling claim cap resets for the renewed policy term (see rolling_claim_cap module docs).
+    crate::rolling_claim_cap::reset_on_renewal(env, &holder, policy_id, now);
 
     PolicyRenewed {
         version: POLICY_EVENT_VERSION,

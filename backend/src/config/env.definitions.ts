@@ -61,6 +61,8 @@ export interface EnvironmentVariables {
   CACHE_TTL_SECONDS: number;
   QUOTE_SIMULATION_CACHE_ENABLED: 'true' | 'false' | '1' | '0';
   QUOTE_SIMULATION_CACHE_TTL_SECONDS: number;
+  ALLOWED_ASSETS_REFRESH_INTERVAL_MS: number;
+  ALLOWED_ASSETS_REFRESH_JITTER_MS: number;
   CAPTCHA_PROVIDER: CaptchaProvider;
   CAPTCHA_SECRET_KEY: string;
   CAPTCHA_SITE_KEY: string;
@@ -746,6 +748,22 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: '30',
     required: 'required',
     schema: Joi.number().integer().min(1).max(600).default(30),
+  },
+  ALLOWED_ASSETS_REFRESH_INTERVAL_MS: {
+    key: 'ALLOWED_ASSETS_REFRESH_INTERVAL_MS',
+    section: 'Caching',
+    description: 'Base refresh interval for allowed assets cache in milliseconds.',
+    example: '300000',
+    required: 'optional',
+    schema: Joi.number().integer().min(1000).default(300000),
+  },
+  ALLOWED_ASSETS_REFRESH_JITTER_MS: {
+    key: 'ALLOWED_ASSETS_REFRESH_JITTER_MS',
+    section: 'Caching',
+    description: 'Randomized jitter added to refresh interval to avoid thundering herd (in milliseconds).',
+    example: '60000',
+    required: 'optional',
+    schema: Joi.number().integer().min(0).default(60000),
   },
   CAPTCHA_PROVIDER: {
     key: 'CAPTCHA_PROVIDER',

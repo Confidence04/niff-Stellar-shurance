@@ -7,6 +7,7 @@ import { CaptchaService } from './captcha.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketStatusDto } from './dto/update-ticket-status.dto';
 import { CreateFaqItemDto, UpdateFaqItemDto, ReorderFaqItemsDto } from './dto/faq.dto';
+import { SupportTicketAutocloseService } from '../maintenance/support-ticket-autoclose.service';
 
 @Injectable()
 export class SupportService {
@@ -16,6 +17,7 @@ export class SupportService {
     private readonly prisma: PrismaService,
     private readonly captcha: CaptchaService,
     private readonly config: ConfigService,
+    private readonly autocloseService?: SupportTicketAutocloseService,
   ) {}
 
   async submitTicket(dto: CreateTicketDto, remoteIp?: string) {
@@ -37,6 +39,29 @@ export class SupportService {
 
     this.logger.log(`Support ticket created: ${ticket.id}`);
     return this.mapToResponse(ticket);
+  }
+
+  async addCustomerReply(ticketId: string, message: string) {
+    const ticket = await this.prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) {
+      throw new BadRequestException(`Ticket ${ticketId} not found`);
+    }
+
+    const reply = await this.prisma.supportTicketReply.create({
+      data: {
+        ticketId,
+        message,
+        author: 'customer',
+      },
+    });
+
+    // Reopen ticket if it was closed due to inactivity
+    if (this.autocloseService) {
+      await this.autocloseService.reopenIfReply(ticketId);
+    }
+
+    this.logger.log(`Customer reply added to ticket ${ticketId}`);
+    return reply;
   }
 
   async updateTicketStatus(ticketId: string, dto: UpdateTicketStatusDto, actor: string, ipAddress?: string) {

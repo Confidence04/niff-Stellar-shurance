@@ -39,9 +39,7 @@ fn default_cooldown_is_zero_allows_successive_changes() {
 fn set_governance_cooldown_succeeds_within_bounds() {
     let (_env, client, _admin) = setup();
     // 100 ledgers is well within the 30-day maximum.
-    assert!(client
-        .try_admin_set_gov_cooldown_ledgers(&100u32)
-        .is_ok());
+    assert!(client.try_admin_set_gov_cooldown_ledgers(&100u32).is_ok());
     assert_eq!(client.get_governance_cooldown_ledgers(), 100);
 }
 
@@ -63,10 +61,7 @@ fn config_change_within_cooldown_reverts() {
 
     // Immediately try another change – must be blocked.
     let result = client.try_admin_set_quorum_bps(&500u32);
-    assert!(
-        result.is_err(),
-        "second change within cooldown must revert"
-    );
+    assert!(result.is_err(), "second change within cooldown must revert");
 }
 
 #[test]
@@ -91,21 +86,17 @@ fn cooldown_enforced_on_vote_duration_change() {
     client.admin_set_gov_cooldown_ledgers(&cooldown);
 
     // Within cooldown: should fail.
-    assert!(
-        client
-            .try_admin_set_vote_duration_ledgers(&types::MIN_VOTING_DURATION_LEDGERS)
-            .is_err()
-    );
+    assert!(client
+        .try_admin_set_vote_duration_ledgers(&types::MIN_VOTING_DURATION_LEDGERS)
+        .is_err());
 
     // Past cooldown: should succeed.
     env.ledger().with_mut(|l| {
         l.sequence_number = l.sequence_number.saturating_add(cooldown + 1);
     });
-    assert!(
-        client
-            .try_admin_set_vote_duration_ledgers(&types::MIN_VOTING_DURATION_LEDGERS)
-            .is_ok()
-    );
+    assert!(client
+        .try_admin_set_vote_duration_ledgers(&types::MIN_VOTING_DURATION_LEDGERS)
+        .is_ok());
 }
 
 #[test]

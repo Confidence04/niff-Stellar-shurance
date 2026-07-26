@@ -73,7 +73,6 @@ pub enum AdminError {
     MaxSweepPerLedgerOutOfBounds = 125,
 }
 
-
 /// Payload for a treasury-rotation proposal.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -592,7 +591,8 @@ fn sweep_token_inner(
         if last_sweep == Some(now) {
             cumulative = storage::get_cumulative_swept_this_ledger(env);
         }
-        let new_cumulative = cumulative.checked_add(amount)
+        let new_cumulative = cumulative
+            .checked_add(amount)
             .unwrap_or_else(|| panic_with_error!(env, AdminError::SweepLedgerLimitExceeded));
         if new_cumulative > max_sweep {
             panic_with_error!(env, AdminError::SweepLedgerLimitExceeded);

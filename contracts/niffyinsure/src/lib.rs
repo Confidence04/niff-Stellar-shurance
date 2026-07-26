@@ -1503,7 +1503,6 @@ impl NiffyInsure {
         Ok(())
     }
 
-
     pub fn admin_set_max_sweep_per_ledger(env: Env, cap: i128) -> Result<(), AdminError> {
         admin::set_max_sweep_per_ledger(&env, cap)
     }
@@ -2151,6 +2150,7 @@ impl NiffyInsure {
         assert!(admin == stored, "only admin");
         storage::bump_instance(&env);
         governance_token::set_governance_token_runtime_enabled(&env, enabled);
+        governance_token::emit_governance_token_activation(&env, &admin, enabled);
         admin::emit_admin_action(&env, &admin, "gov_set_token_runtime_enabled");
     }
 

@@ -56,7 +56,12 @@ export class TxSubmitWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   private async process(job: Job<TxSubmitJobData>) {
-    const { signed_xdr } = job.data;
+    const { signed_xdr, idempotency_key } = job.data;
+
+    if (idempotency_key && job.id !== `idem:${idempotency_key}`) {
+      this.logger.warn(`Idempotency key mismatch for job ${job.id}: expected idem:${idempotency_key}`);
+    }
+
     const rpcUrl = this.config.get<string>('SOROBAN_RPC_URL', 'https://soroban-testnet.stellar.org');
     const passphrase = this.config.get<string>('STELLAR_NETWORK_PASSPHRASE', 'Test SDF Network ; September 2015');
 

@@ -439,7 +439,7 @@ model RegisteredVoter {
 
 /// Off-chain profile for a wallet holder. Created on first authenticated GET /profile.
 model HolderProfile {
-  walletAddress         String   @id @map("wallet_address")
+  walletAddress         String   @id @unique @map("wallet_address")
   displayName           String?  @map("display_name")
   /// Stored as-is; anonymized by the privacy service on request.
   email                 String?
@@ -475,4 +475,53 @@ enum PostStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+/// Tracks ramp transaction records received via webhooks for reconciliation.
+model RampTransaction {
+  id                String   @id @default(uuid())
+  purchaseId        String   @unique /// Ramp provider's purchase ID
+  status            String   /// COMPLETE, FAILED, REFUNDED
+  receiverAddress   String   @map("receiver_address")
+  cryptoAmount      String   @map("crypto_amount")
+  cryptoCurrency    String   @map("crypto_currency")
+  fiatValue         Decimal  @map("fiat_value")
+  fiatCurrency      String   @map("fiat_currency")
+  finalTxHash       String?  @map("final_tx_hash")
+  lastSyncedAt      DateTime @map("last_synced_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([receiverAddress])
+  @@index([lastSyncedAt])
+  @@map("ramp_transactions")
+}
+
+/// Tracks last-known health status of the ramp provider.
+model RampProviderHealth {
+  id                String   @id @default(uuid())
+  status            String   /// up, degraded, down
+  lastCheckedAt     DateTime @map("last_checked_at")
+  errorMessage      String?  @map("error_message")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("ramp_provider_health")
+}
+
+/// Immutable audit log for profile field-level changes.
+model ProfileAuditLog {
+  id                String   @id @default(uuid())
+  walletAddress     String   @map("wallet_address")
+  fieldName         String   @map("field_name")
+  oldValue          String?  @map("old_value")
+  newValue          String?  @map("new_value")
+  actor             String   /// wallet address or system identifier
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([walletAddress])
+  @@index([fieldName])
+  @@index([createdAt])
+  @@map("profile_audit_logs")
 }

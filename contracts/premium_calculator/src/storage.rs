@@ -30,10 +30,11 @@ pub fn set_paused(env: &Env, paused: bool) {
 }
 
 pub fn is_paused(env: &Env) -> bool {
-    env.storage()
-        .instance()
-        .get(&DataKey::Paused)
-        .unwrap_or(false)
+    // Absent key means not paused — never panic on missing storage.
+    match env.storage().instance().get(&DataKey::Paused) {
+        Some(v) => v,
+        None => false,
+    }
 }
 
 pub fn default_table(env: &Env) -> MultiplierTable {

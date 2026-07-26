@@ -115,7 +115,7 @@ pub enum Error {
     ProtocolFeeOutOfBounds = 71,
     /// Minimum solvency ratio basis points outside documented bounds.
     SolvencyRatioOutOfBounds = 72,
-    /// External premium calculator returned an incompatible config version.
+    /// External premium calculator ABI version does not match the expected pin.
     CalculatorVersionMismatch = 73,
     /// Commit-reveal voting phases are not configured for this claim.
     CommitRevealNotSet = 74,
@@ -133,6 +133,10 @@ pub enum Error {
     DuplicateEvidence = 80,
     /// Requested page_size exceeds the hard cap for this query.
     PageSizeTooLarge = 81,
+    /// Escalation deadline must be strictly after the current ledger.
+    EscalationDeadlineNotFuture = 82,
+    /// Escalation deadline must be earlier than the current voting deadline.
+    EscalationDeadlineNotEarlier = 83,
 }
 
 pub fn check_claim_evidence_update(
@@ -337,6 +341,12 @@ pub enum OracleError {
     ReplayedNonce,
     /// Quorum threshold not met (not enough valid signatures).
     QuorumNotMet,
+    /// No trigger record found for the given trigger_id.
+    ///
+    /// This is the canonical "no data" response when querying a trigger that
+    /// has not been submitted or has been pruned. Callers must treat this as a
+    /// definitive "not found" — not as a transient network error.
+    TriggerNotFound,
 }
 
 // ── Oracle trigger validators (experimental only) ────────────────────────────
@@ -465,6 +475,13 @@ pub enum OracleError {
     QuorumNotMet,
     InvalidSignature,
     SourceNotRegistered,
+    /// No trigger record found for the given trigger_id.
+    ///
+    /// Canonical "no data" response when the oracle stub has no data available
+    /// for a requested query. Callers must treat this as a definitive
+    /// "not found" — not as a transient error. This is the safe-failure mode
+    /// when no oracle data has been submitted or the oracle is disabled.
+    TriggerNotFound,
 }
 
 /// Stub: Panics in default builds to prevent oracle trigger validation.

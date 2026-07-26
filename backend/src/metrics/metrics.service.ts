@@ -32,6 +32,7 @@ export class MetricsService implements OnModuleInit {
   readonly dlqDepth: client.Gauge<string>;
   readonly dlqJobFailed: client.Counter<string>;
   readonly queueActiveWorkers: client.Gauge<string>;
+  readonly queueDepth: client.Gauge<string>;
   readonly bullmqJobRetriesTotal: client.Counter<string>;
   readonly queueDepth: client.Gauge<string>;
   readonly jobProcessingDuration: client.Histogram<string>;
@@ -151,6 +152,13 @@ export class MetricsService implements OnModuleInit {
     this.queueActiveWorkers = new client.Gauge({
       name: 'bullmq_queue_active_workers',
       help: 'Number of active workers for a queue (jobs being processed)',
+      labelNames: ['queue'],
+      registers: [this.registry],
+    });
+
+    this.queueDepth = new client.Gauge({
+      name: 'bullmq_queue_depth',
+      help: 'Total number of pending jobs in a queue (waiting + active + delayed)',
       labelNames: ['queue'],
       registers: [this.registry],
     });
@@ -454,25 +462,12 @@ export class MetricsService implements OnModuleInit {
     this.bullmqJobRetriesTotal.inc({ queue: opts.queue, job_name: opts.jobName });
   }
 
-  recordQueueDepth(queue: string, depth: number) {
-    this.queueDepth.set({ queue }, depth);
-  }
-
-  recordJobProcessingDuration(opts: {
-    queue: string;
-    jobName: string;
-    status: 'completed' | 'failed';
-    durationMs: number;
-  }) {
-    const durationSec = opts.durationMs / 1000;
-    this.jobProcessingDuration.observe(
-      { queue: opts.queue, job_name: opts.jobName, status: opts.status },
-      durationSec,
-    );
-  }
-
   recordQueueActiveWorkers(opts: { queue: string; count: number }) {
     this.queueActiveWorkers.set({ queue: opts.queue }, opts.count);
+  }
+
+  recordQueueDepth(opts: { queue: string; depth: number }) {
+    this.queueDepth.set({ queue: opts.queue }, opts.depth);
   }
 
   async getMetrics(): Promise<string> {

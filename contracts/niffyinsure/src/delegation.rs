@@ -120,6 +120,9 @@ pub fn revoke_delegation(env: &Env, admin: &Address, operator: &Address) {
 }
 
 /// Check if `operator` has a valid (non-expired) delegation.
+///
+/// Natural expiry is silent: when `now > expiry_ledger` this returns `None`
+/// without emitting [`DelegationRevoked`].
 pub fn get_delegation(env: &Env, operator: &Address) -> Option<DelegationRecord> {
     let record = storage::get_delegation(env, operator)?;
     let now = env.ledger().sequence();

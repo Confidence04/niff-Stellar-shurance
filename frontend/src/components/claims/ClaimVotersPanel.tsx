@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { ClaimsListSkeleton } from '@/features/claims/components/ClaimsSkeleton'
 import { fetchClaimVoters, type ClaimVoter } from '@/lib/api/claim-detail'
 
 interface ClaimVotersPanelProps {
@@ -74,13 +74,7 @@ export function ClaimVotersPanel({ claimId }: ClaimVotersPanelProps) {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading && (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-lg" />
-            ))}
-          </div>
-        )}
+        {isLoading && <ClaimsListSkeleton rows={3} />}
         {isError && (
           <p className="text-sm text-muted-foreground">Could not load voter list.</p>
         )}

@@ -139,6 +139,12 @@ export interface EnvironmentVariables {
   TREASURY_ALERT_WEBHOOK_URLS: string;
   /** Maximum outbound webhook payload size in bytes. Payloads exceeding this are rejected. Defaults to 1 MB. */
   MAX_OUTBOUND_WEBHOOK_SIZE_BYTES: number;
+  /** Webhook verification challenge timeout in milliseconds. Defaults to 5 minutes. */
+  WEBHOOK_VERIFICATION_TIMEOUT_MS: number;
+  /** Maximum attempts to send verification challenge before marking webhook inactive. Defaults to 3. */
+  WEBHOOK_MAX_VERIFICATION_ATTEMPTS: number;
+  /** API base URL for webhook verification links. */
+  API_BASE_URL: string;
   PAGINATION_HMAC_SECRET: string;
   DISABLE_REINDEX_WORKER: string;
   RENEWAL_REMINDER_CRON: string;
@@ -1378,6 +1384,30 @@ export const ENV_DEFINITIONS: EnvDefinitionMap = {
     example: '1048576',
     required: 'optional',
     schema: Joi.number().integer().min(1024).default(1048576),
+  },
+  WEBHOOK_VERIFICATION_TIMEOUT_MS: {
+    key: 'WEBHOOK_VERIFICATION_TIMEOUT_MS',
+    section: 'Webhooks',
+    description: 'Timeout in milliseconds for webhook verification challenges. After this, the challenge expires.',
+    example: '300000',
+    required: 'optional',
+    schema: Joi.number().integer().min(10_000).default(300_000),
+  },
+  WEBHOOK_MAX_VERIFICATION_ATTEMPTS: {
+    key: 'WEBHOOK_MAX_VERIFICATION_ATTEMPTS',
+    section: 'Webhooks',
+    description: 'Maximum number of attempts to send verification challenge before marking webhook inactive.',
+    example: '3',
+    required: 'optional',
+    schema: Joi.number().integer().min(1).default(3),
+  },
+  API_BASE_URL: {
+    key: 'API_BASE_URL',
+    section: 'URLs',
+    description: 'Base URL of the API, used in webhook verification links and other features.',
+    example: 'https://api.example.com',
+    required: 'required',
+    schema: Joi.string().uri().required(),
   },
   PAGINATION_HMAC_SECRET: {
     key: 'PAGINATION_HMAC_SECRET',

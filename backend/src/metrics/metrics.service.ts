@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import * as client from 'prom-client';
+import { MetricsCardinalityGuard } from './cardinality-guard.service';
 
 /**
  * MetricsService — single source of truth for all Prometheus metrics.
@@ -11,6 +12,8 @@ import * as client from 'prom-client';
  *                for the histogram; exact code for counters is fine because the
  *                set is bounded.
  *  - `rpc_method`: one of a fixed enum of Soroban RPC calls
+ *  - `claim_id`: bucketed to ranges (0-999, 1000-1999, ...) via cardinality guard
+ *  - `tenant`: normalized to hash or well-known ID via cardinality guard
  *
  * Extension point for OpenTelemetry:
  *  Replace the prom-client calls in recordHttpRequest / recordRpcCall with
@@ -20,6 +23,7 @@ import * as client from 'prom-client';
 @Injectable()
 export class MetricsService implements OnModuleInit {
   private readonly registry: client.Registry;
+  private readonly cardinalityGuard: MetricsCardinalityGuard;
 
   // ── HTTP metrics ──────────────────────────────────────────────────────────
   readonly httpRequestDuration: client.Histogram<string>;
@@ -87,7 +91,8 @@ export class MetricsService implements OnModuleInit {
   /** Total mismatches found in a single reconciliation run. */
   readonly voteReconciliationMismatchCount: client.Counter<string>;
 
-  constructor() {
+  constructor(cardinalityGuard: MetricsCardinalityGuard) {
+    this.cardinalityGuard = cardinalityGuard;
     this.registry = new client.Registry();
     this.registry.setDefaultLabels({ app: 'niffyinsure-api' });
 
@@ -383,12 +388,14 @@ export class MetricsService implements OnModuleInit {
   }
 
   recordSolvencyBuffer(opts: { tenant: string; bufferStroops: bigint }) {
-    this.solvencyBufferStroops.set({ tenant: opts.tenant }, Number(opts.bufferStroops));
+    const normalizedTenant = this.cardinalityGuard.normalizeTenantId(opts.tenant);
+    this.solvencyBufferStroops.set({ tenant: normalizedTenant }, Number(opts.bufferStroops));
   }
 
   recordSolvencyThreshold(opts: { tenant: string; thresholdStroops: bigint }) {
+    const normalizedTenant = this.cardinalityGuard.normalizeTenantId(opts.tenant);
     this.solvencyBufferThresholdStroops.set(
-      { tenant: opts.tenant },
+      { tenant: normalizedTenant },
       Number(opts.thresholdStroops),
     );
   }
@@ -422,7 +429,8 @@ export class MetricsService implements OnModuleInit {
     onChainApprove: number,
     onChainReject: number,
   ) {
-    this.voteTallyMismatches.inc({ claim_id: String(claimId) });
+    const normalizedClaimId = this.cardinalityGuard.normalizeClaimId(claimId);
+    this.voteTallyMismatches.inc({ claim_id: normalizedClaimId });
   }
 
   recordVoteReconciliationError() {

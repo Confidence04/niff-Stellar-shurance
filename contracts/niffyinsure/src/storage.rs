@@ -216,6 +216,8 @@ pub enum DataKey {
     AllowedAssetConfig(Address),
     // ── Issue #585: Admin role delegation ────────────────────────────────────
     Delegation(Address),
+    /// Ordered index of operators that currently have a stored delegation record.
+    DelegationOperatorIndex,
     // ── Issue #581: Reinsurance pool ─────────────────────────────────────────
     ReinsuranceContract,
     // ── Treasury depositor allowlist ─────────────────────────────────────────
@@ -243,6 +245,13 @@ pub enum DataKey {
     /// Admin-configurable seconds-per-ledger estimate for UI deadline display.
     /// Falls back to [`crate::ledger::SECS_PER_LEDGER`] (5) when unset.
     SecsPerLedgerEstimate,
+    // ── Admin role separation (Issue #1161) ───────────────────────────────────
+    /// Address authorized to call pause/unpause. Falls back to Admin when unset.
+    PauseAdmin,
+    /// Address authorized to call treasury operations (drain, sweep, rotation). Falls back to Admin.
+    TreasuryAdmin,
+    /// Address authorized to call governance parameter changes. Falls back to Admin.
+    ParamAdmin,
 }
 
 pub fn has_open_claim(env: &Env, holder: &Address, policy_id: u32) -> bool {
@@ -1757,6 +1766,45 @@ pub fn remove_delegation(env: &Env, operator: &Address) {
         .remove(&DataKey::Delegation(operator.clone()));
 }
 
+fn get_delegation_operator_index(env: &Env) -> Vec<Address> {
+    env.storage()
+        .instance()
+        .get(&DataKey::DelegationOperatorIndex)
+        .unwrap_or_else(|| Vec::new(env))
+}
+
+fn set_delegation_operator_index(env: &Env, index: &Vec<Address>) {
+    env.storage()
+        .instance()
+        .set(&DataKey::DelegationOperatorIndex, index);
+}
+
+/// Insert `operator` into the delegation index if not already present.
+pub fn index_delegation_operator(env: &Env, operator: &Address) {
+    let mut index = get_delegation_operator_index(env);
+    for i in 0..index.len() {
+        if index.get(i).as_ref() == Some(operator) {
+            return;
+        }
+    }
+    index.push_back(operator.clone());
+    set_delegation_operator_index(env, &index);
+}
+
+/// Remove `operator` from the delegation index (no-op if absent).
+pub fn unindex_delegation_operator(env: &Env, operator: &Address) {
+    let index = get_delegation_operator_index(env);
+    let mut next: Vec<Address> = Vec::new(env);
+    for i in 0..index.len() {
+        if let Some(addr) = index.get(i) {
+            if &addr != operator {
+                next.push_back(addr);
+            }
+        }
+    }
+    set_delegation_operator_index(env, &next);
+}
+
 // ── Issue #581: Reinsurance pool ──────────────────────────────────────────────
 
 pub fn set_reinsurance_contract(env: &Env, addr: &Address) {
@@ -2108,4 +2156,40 @@ pub fn get_secs_per_ledger_estimate(env: &Env) -> u32 {
         .instance()
         .get(&DataKey::SecsPerLedgerEstimate)
         .unwrap_or(crate::ledger::SECS_PER_LEDGER)
+}
+
+// ── Admin role separation (Issue #1161) ───────────────────────────────────────
+//
+// Three scoped roles supplement the single admin key:
+//   - PauseAdmin   : may call pause / unpause only.
+//   - TreasuryAdmin: may call drain, sweep, and treasury-rotation operations.
+//   - ParamAdmin   : may call governance parameter changes (evidence count, cooldowns, …).
+//
+// When a role is unset, the main Admin address is accepted as a fallback so
+// that existing single-admin deployments continue to work without re-configuration.
+
+pub fn set_pause_admin(env: &Env, addr: &Address) {
+    env.storage().instance().set(&DataKey::PauseAdmin, addr);
+}
+
+pub fn get_pause_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::PauseAdmin)
+}
+
+pub fn set_treasury_admin(env: &Env, addr: &Address) {
+    env.storage()
+        .instance()
+        .set(&DataKey::TreasuryAdmin, addr);
+}
+
+pub fn get_treasury_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::TreasuryAdmin)
+}
+
+pub fn set_param_admin(env: &Env, addr: &Address) {
+    env.storage().instance().set(&DataKey::ParamAdmin, addr);
+}
+
+pub fn get_param_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::ParamAdmin)
 }

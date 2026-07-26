@@ -388,6 +388,13 @@ Look for issues labelled **`good first issue`** on GitHub. These are scoped to b
 1. Comment on the issue to claim it — avoids duplicate work.
 2. Ask questions in the issue thread before writing code.
 3. Open a draft PR early so reviewers can give early feedback.
+
+### Cross-stack features
+
+If your issue is one part of a feature that spans contract, backend, and/or
+frontend, follow the
+[cross-stack issue linking convention](docs/issues/cross-stack-linking-convention.md)
+to keep the related issues discoverable.
 4. Reference the issue in your PR description: `Closes #<issue-number>`.
 
 ---

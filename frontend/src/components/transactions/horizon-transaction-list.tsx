@@ -1,13 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Download } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   fetchHorizonTransactions,
   type HorizonOperationRecord,
 } from '@/lib/api/horizon-transactions'
+import { downloadTransactionsCsv } from '@/lib/export-transactions-csv'
 import { cn } from '@/lib/utils'
 
 function formatOperationSummary(op: HorizonOperationRecord): string {
@@ -157,6 +160,19 @@ export function HorizonTransactionList({ account }: HorizonTransactionListProps)
 
   return (
     <section aria-label="Transaction history" className="space-y-3">
+      {!isLoading && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadTransactionsCsv(records)}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <LoadingRows />
       ) : (

@@ -3,9 +3,11 @@
  */
 
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { HorizonTransactionList } from '../horizon-transaction-list'
 import * as horizonApi from '@/lib/api/horizon-transactions'
+import { buildTransactionsCsv } from '@/lib/export-transactions-csv'
 
 jest.mock('@/lib/api/horizon-transactions')
 
@@ -109,5 +111,128 @@ describe('HorizonTransactionList', () => {
     })
 
     expect(mockFetch.mock.calls[1][1]).toBe('cursor-2')
+  })
+})
+
+describe('Export CSV', () => {
+  beforeEach(() => {
+    global.URL.createObjectURL = jest.fn(() => 'blob:mock-url')
+    global.URL.revokeObjectURL = jest.fn()
+  })
+
+  it('shows the Export CSV button when records are loaded', async () => {
+    mockFetch.mockResolvedValueOnce({ records: [baseOp] })
+
+    render(<HorizonTransactionList account={ACCOUNT} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument()
+    })
+  })
+
+  it('does not show the Export CSV button while loading', () => {
+    mockFetch.mockReturnValue(new Promise(() => {}))
+
+    render(<HorizonTransactionList account={ACCOUNT} />)
+
+    expect(screen.queryByRole('button', { name: /export csv/i })).not.toBeInTheDocument()
+  })
+
+  it('triggers a CSV download when the export button is clicked', async () => {
+    const user = userEvent.setup()
+
+    mockFetch.mockResolvedValueOnce({ records: [baseOp] })
+
+    render(<HorizonTransactionList account={ACCOUNT} />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /export csv/i }))
+
+    expect(global.URL.createObjectURL).toHaveBeenCalled()
+    expect(global.URL.revokeObjectURL).toHaveBeenCalled()
+  })
+})
+
+describe('buildTransactionsCsv', () => {
+  it('produces a header-only CSV for empty records', () => {
+    const csv = buildTransactionsCsv([])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toBe('Date,Type,Amount,Asset,Tx Hash,Status,Contract Events,Raw Timestamp')
+  })
+
+  it('includes all visible columns plus raw timestamp', () => {
+    const csv = buildTransactionsCsv([baseOp])
+    const lines = csv.split('\n')
+    expect(lines).toHaveLength(2)
+
+    const dataRow = lines[1]
+    expect(dataRow).toContain('payment')
+    expect(dataRow).toContain('10.0000000')
+    expect(dataRow).toContain('XLM')
+    expect(dataRow).toContain('hash-abc')
+    expect(dataRow).toContain('success')
+    expect(dataRow).toContain('2024-01-15T10:00:00Z')
+  })
+
+  it('includes contract events joined by semicolons', () => {
+    const csv = buildTransactionsCsv([
+      {
+        ...baseOp,
+        contractEvents: [
+          { description: 'Event A' },
+          { description: 'Event B' },
+        ],
+      },
+    ])
+    const lines = csv.split('\n')
+    expect(lines[1]).toContain('Event A; Event B')
+  })
+
+  it('escapes fields containing commas', () => {
+    const csv = buildTransactionsCsv([
+      {
+        ...baseOp,
+        contractEvents: [{ description: 'Sold 100 USDC, bought 50 XLM' }],
+      },
+    ])
+    const lines = csv.split('\n')
+    expect(lines[1]).toContain('"Sold 100 USDC, bought 50 XLM"')
+  })
+
+  it('escapes fields containing double quotes', () => {
+    const csv = buildTransactionsCsv([
+      {
+        ...baseOp,
+        contractEvents: [{ description: 'Called "transfer" method' }],
+      },
+    ])
+    const lines = csv.split('\n')
+    expect(lines[1]).toContain('"Called ""transfer"" method"')
+  })
+
+  it('shows failed status for unsuccessful transactions', () => {
+    const csv = buildTransactionsCsv([
+      { ...baseOp, transaction_successful: false },
+    ])
+    const lines = csv.split('\n')
+    expect(lines[1]).toContain('failed')
+  })
+
+  it('leaves amount and asset empty for operations without amounts', () => {
+    const csv = buildTransactionsCsv([
+      {
+        ...baseOp,
+        type: 'set_options',
+        amount: undefined,
+      },
+    ])
+    const lines = csv.split('\n')
+    const fields = lines[1].split(',')
+    expect(fields[2]).toBe('')
+    expect(fields[3]).toBe('')
   })
 })

@@ -22,7 +22,7 @@ export class FeedsController {
    */
   @Get('claims.atom')
   async claimsAtom(@Res() res: Response): Promise<void> {
-    const xml = await this.feedsService.buildClaimsAtomFeed();
+    const xml = await this.feedsService.getCachedClaimsAtomFeed();
     res.set('Content-Type', 'application/atom+xml; charset=utf-8');
     res.set('Cache-Control', 'public, max-age=300');
     res.end(xml);

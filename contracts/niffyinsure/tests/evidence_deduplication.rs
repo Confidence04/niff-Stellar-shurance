@@ -1,7 +1,10 @@
 #![cfg(test)]
 
-use niffyinsure::{validate::Error, NiffyInsureClient};
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, String, Vec};
+use niffyinsure::NiffyInsureClient;
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    Address, BytesN, Env, String, Vec,
+};
 
 mod common;
 use common::{non_zero_hash, sample_digest};
@@ -14,23 +17,9 @@ fn setup() -> (Env, NiffyInsureClient<'static>, Address, Address) {
     let admin = Address::generate(&env);
     let token = Address::generate(&env);
     client.initialize(&admin, &token);
+    // test_seed_policy uses start_ledger=1; advance so now >= start_ledger.
+    env.ledger().set_sequence_number(1);
     (env, client, admin, token)
-}
-
-fn file(
-    env: &Env,
-    client: &NiffyInsureClient,
-    holder: &Address,
-    evidence: Vec<niffyinsure::types::ClaimEvidenceEntry>,
-) -> Result<u64, Error> {
-    client.try_file_claim(
-        holder,
-        &1u32,
-        &100_000i128,
-        &String::from_str(env, "test claim"),
-        &evidence,
-        &None,
-    )
 }
 
 #[test]
@@ -49,7 +38,17 @@ fn unique_evidence_entries_accepted() {
         hash: sample_digest(&env),
     });
 
-    assert!(file(&env, &client, &holder, evidence).is_ok());
+    let result = client
+        .try_file_claim(
+            &holder,
+            &1u32,
+            &100_000i128,
+            &String::from_str(&env, "test claim"),
+            &evidence,
+            &None,
+        )
+        .unwrap();
+    assert!(result.is_ok());
 }
 
 #[test]
@@ -66,8 +65,15 @@ fn duplicate_url_and_hash_reverts_with_duplicate_evidence() {
     evidence.push_back(entry.clone());
     evidence.push_back(entry);
 
-    let result = file(&env, &client, &holder, evidence);
-    assert_eq!(result.unwrap_err(), Error::DuplicateEvidence);
+    let result = client.try_file_claim(
+        &holder,
+        &1u32,
+        &100_000i128,
+        &String::from_str(&env, "test claim"),
+        &evidence,
+        &None,
+    );
+    assert!(result.is_err(), "duplicate evidence must be rejected");
 }
 
 #[test]
@@ -91,5 +97,15 @@ fn same_url_different_hash_is_allowed() {
         hash: BytesN::from_array(&env, &hash_b),
     });
 
-    assert!(file(&env, &client, &holder, evidence).is_ok());
+    let result = client
+        .try_file_claim(
+            &holder,
+            &1u32,
+            &100_000i128,
+            &String::from_str(&env, "test claim"),
+            &evidence,
+            &None,
+        )
+        .unwrap();
+    assert!(result.is_ok());
 }

@@ -89,3 +89,55 @@ describe('MetricsService — bullmq_queue_active_workers gauge (#874)', () => {
     expect(txSubmitMatch?.[1]).toBe('5');
   });
 });
+
+describe('MetricsService — queue depth and processing duration (#1112)', () => {
+  let service: MetricsService;
+
+  beforeEach(() => {
+    service = new MetricsService();
+  });
+
+  it('queueDepth gauge is registered with queue label', () => {
+    expect(service.queueDepth).toBeDefined();
+    expect(() => service.recordQueueDepth('claim-events', 10)).not.toThrow();
+  });
+
+  it('recordQueueDepth sets gauge value per queue', async () => {
+    service.recordQueueDepth('claim-events', 5);
+    service.recordQueueDepth('tx-submit', 2);
+    const metrics = await service.getMetrics();
+    expect(metrics).toContain('bullmq_queue_depth');
+    expect(metrics).toContain('queue="claim-events"');
+  });
+
+  it('jobProcessingDuration histogram is registered', () => {
+    expect(service.jobProcessingDuration).toBeDefined();
+    expect(() =>
+      service.recordJobProcessingDuration({
+        queue: 'claim-events',
+        jobName: 'process-claim',
+        status: 'completed',
+        durationMs: 500,
+      }),
+    ).not.toThrow();
+  });
+
+  it('recordJobProcessingDuration tracks completed and failed jobs', async () => {
+    service.recordJobProcessingDuration({
+      queue: 'claim-events',
+      jobName: 'process-claim',
+      status: 'completed',
+      durationMs: 1200,
+    });
+    service.recordJobProcessingDuration({
+      queue: 'claim-events',
+      jobName: 'process-claim',
+      status: 'failed',
+      durationMs: 500,
+    });
+    const metrics = await service.getMetrics();
+    expect(metrics).toContain('bullmq_job_processing_duration_seconds');
+    expect(metrics).toContain('status="completed"');
+    expect(metrics).toContain('status="failed"');
+  });
+});

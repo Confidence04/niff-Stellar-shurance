@@ -74,6 +74,22 @@ export class QueueMonitorService implements OnModuleInit, OnModuleDestroy {
           // Intermediate failure — job will be retried.
           this.metrics.recordJobRetry({ queue: cfg.name, jobName: job.name });
         }
+        const duration = (Date.now() - (job.processedOn ?? job.timestamp ?? 0)) / 1000;
+        this.metrics.recordJobProcessingDuration({
+          queue: cfg.name,
+          jobName: job.name,
+          status: 'failed',
+          durationMs: duration * 1000,
+        });
+      });
+      w.on('completed', (job: Job) => {
+        const duration = (Date.now() - (job.processedOn ?? job.timestamp ?? 0)) / 1000;
+        this.metrics.recordJobProcessingDuration({
+          queue: cfg.name,
+          jobName: job.name,
+          status: 'completed',
+          durationMs: duration * 1000,
+        });
       });
       this.workers.push(w);
     }
@@ -94,8 +110,9 @@ export class QueueMonitorService implements OnModuleInit, OnModuleDestroy {
   private async pollDepths() {
     for (const q of this.queues) {
       try {
-        const counts = await q.getJobCounts('failed');
+        const counts = await q.getJobCounts();
         this.metrics.dlqDepth.set({ queue: q.name }, counts.failed ?? 0);
+        this.metrics.recordQueueDepth(q.name, counts.waiting ?? 0);
       } catch {
         // Redis may be unavailable — skip silently, alert will fire on stale gauge
       }

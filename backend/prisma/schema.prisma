@@ -292,11 +292,29 @@ model SupportTicket {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
+  replies          SupportTicketReply[]
+
   @@index([status])
   @@index([assignedTo])
   @@index([createdAt])
   @@index([firstRespondedAt])
   @@map("support_tickets")
+}
+
+/// Customer or staff reply to a support ticket.
+model SupportTicketReply {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  message   String
+  /// 'customer' or 'staff'
+  author    String
+  createdAt DateTime @default(now())
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("support_ticket_replies")
 }
 
 /// Privacy-safe FAQ expansion counters.

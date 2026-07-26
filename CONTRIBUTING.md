@@ -180,9 +180,21 @@ npm run test:e2e
 ```bash
 npm run env:example:generate   # regenerate .env.example from env.definitions.ts
 npm run env:example:check      # verify .env.example is not drifted
-npm run export-spec            # regenerate backend/openapi.json
+npm run export-spec            # regenerate backend/openapi.json from DTOs
 npm run error-catalog:check    # verify error codes are consistent
 ```
+
+### OpenAPI spec drift
+
+If you modify a backend DTO (request/response body), the OpenAPI spec must be regenerated:
+
+```bash
+cd backend
+npm run export-spec
+git add openapi.json
+```
+
+CI will fail if the spec drifts from the committed version. Always regenerate and commit the updated file when DTOs change.
 
 ### Fixing CI: `unit-tests` job
 
@@ -190,7 +202,7 @@ npm run error-catalog:check    # verify error codes are consistent
 |---|---|
 | `npm test` fails | Run `npm test` locally and fix the failing test |
 | `.env.example` drift | Run `npm run env:example:generate` and commit the updated file |
-| `openapi.json` stale | Run `make generate-client` and commit the updated file |
+| OpenAPI spec drift | Run `npm run export-spec` and commit the updated `backend/openapi.json` |
 | `npm audit` high/critical | Update or patch the flagged dependency |
 
 ### Fixing CI: `address-normalization` job

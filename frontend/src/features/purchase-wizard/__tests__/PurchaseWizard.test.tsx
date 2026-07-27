@@ -10,8 +10,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockPush = jest.fn()
+let mockSearchParams = new URLSearchParams()
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => mockSearchParams,
 }))
 
 const mockWalletState = {
@@ -101,6 +103,7 @@ async function fillStep1AndSubmit() {
 beforeEach(() => {
   jest.clearAllMocks()
   localStorageMock.clear()
+  mockSearchParams = new URLSearchParams()
   mockWalletState.address = null
   mockWalletState.connectionStatus = 'disconnected'
   mockWalletState.signTransaction.mockReset()
@@ -490,6 +493,39 @@ describe('PurchaseWizard — Draft Persistence', () => {
     await waitFor(() => {
       // Should be on step 0, not step 1
       expect(screen.getByLabelText(/policy type/i)).toBeInTheDocument()
+    })
+  })
+
+  it('prefills coverage details from a valid shared quote link', async () => {
+    mockSearchParams = new URLSearchParams({
+      policy_type: 'Health',
+      region: 'High',
+      coverage_tier: 'Premium',
+      age: '45',
+      risk_score: '7',
+      premium_xlm: '2.5',
+      premium_stroops: '25000000',
+    })
+    renderWizard()
+    await waitFor(() => {
+      const select = screen.getByLabelText(/policy type/i) as HTMLSelectElement
+      expect(select.value).toBe('Health')
+    })
+    expect((screen.getByLabelText(/your age/i) as HTMLInputElement).value).toBe('45')
+  })
+
+  it('falls back to the normal blank start when the shared link is invalid', async () => {
+    mockSearchParams = new URLSearchParams({
+      policy_type: 'NotARealType',
+      region: 'High',
+      coverage_tier: 'Premium',
+      age: '45',
+      risk_score: '7',
+    })
+    renderWizard()
+    await waitFor(() => {
+      const select = screen.getByLabelText(/policy type/i) as HTMLSelectElement
+      expect(select.value).toBe('')
     })
   })
 

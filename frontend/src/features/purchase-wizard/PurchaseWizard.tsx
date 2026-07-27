@@ -25,6 +25,12 @@ function buildSteps(current: WizardStep): Step[] {
   })) as Step[]
 }
 
+/** Returns true when the wizard has unsaved data worth guarding. */
+function hasUnsavedData(step: WizardStep, coverageData: Partial<QuoteFormData>): boolean {
+  if (step > 0) return true
+  return Object.values(coverageData).some((v) => v !== undefined && v !== '' && v !== null)
+}
+
 export function PurchaseWizard() {
   const { hasDraft, saveDraft, loadDraft, clearDraft } = useDraftPersistence<WizardDraft>(
     WIZARD_DRAFT_KEY,
@@ -38,6 +44,7 @@ export function PurchaseWizard() {
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [quoteExpiresAt, setQuoteExpiresAt] = useState<number | null>(null)
   const restoredRef = useRef(false)
+  const completedRef = useRef(false)
 
   useEffect(() => {
     if (restoredRef.current) return
@@ -62,6 +69,18 @@ export function PurchaseWizard() {
       }
     }
   }, [hasDraft, loadDraft, searchParams])
+
+  // Navigation guard — warn before discarding entered coverage details
+  useEffect(() => {
+    if (completedRef.current || !hasUnsavedData(step, coverageData)) return
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [step, coverageData])
 
   const persistDraft = useCallback(
     (patch: Partial<WizardDraft>) => {
@@ -119,6 +138,7 @@ export function PurchaseWizard() {
 
   // Success
   const handleSuccess = useCallback(() => {
+    completedRef.current = true
     clearDraft()
   }, [clearDraft])
 
